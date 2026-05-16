@@ -2,18 +2,18 @@
 # Add your own SE-layer dependencies (tenacity, asyncpg, fastapi/click, etc.)
 # to your project's main requirements.txt.
 
-httpx>=0.27         # async HTTP for the source fetchers
-numpy>=1.24         # imported by the shared provider base classes
-pydantic>=2.7
+httpx
+numpy
+pydantic
 
 # Pick ONE or more LLM providers depending on what you'll use:
-anthropic>=0.39.0      ; extra == "anthropic"
-openai>=1.50.0         ; extra == "openai"
-google-genai>=0.3.0    ; extra == "gemini"
+anthropic   ; extra == "anthropic"
+openai; extra == "openai"
+google-genai; extra == "gemini"
 
 # Pick ONE web search provider:
 # Tavily and Serper are accessed via plain httpx (already required) — no extra package.
-duckduckgo-search>=6.0 ; extra == "duckduckgo"
+duckduckgo-search; extra == "duckduckgo"
 
 # HTTP (sync)
 requests
@@ -55,15 +55,14 @@ arxiv
 # Web search
 tavily-python
 google-search-results
-brave-search
 
 
 # Testing
 pytest-cov
 respx
 responses
-pytest>=8.0
-pytest-asyncio>=0.23
+pytest
+pytest-asyncio
 
 # Type checking
 mypy

@@ -130,3 +130,5 @@ docker-compose.override.yml
 .temp/
 tmp/
 temp/
+docs/
+templates/

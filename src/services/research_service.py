@@ -9,9 +9,12 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Literal
 
+import httpx
+
 from ai import AnswerWithCitations, Source, fetch_arxiv, fetch_web, fetch_wikipedia, synthesize
 from ai.providers.base import ProviderError
 from src.config import Settings
+from src.services.external_policy import ExternalCallPolicy
 from src.storage.repository import PostgresRepository
 
 logger = logging.getLogger(__name__)
@@ -89,11 +92,16 @@ class ResearchService:
             repository: PostgresRepository | None = None,
             max_question_chars: int = 1_000,
             max_retries: int = 3,
+            external_policy: ExternalCallPolicy | None = None,
     ) -> None:
         self.settings = settings
         self.repository = repository
         self.max_question_chars = max_question_chars
         self.max_retries = max_retries
+        self.external_policy = external_policy or ExternalCallPolicy.from_settings(
+            settings,
+            max_retries=max_retries,
+        )
 
     async def ask(
             self,
@@ -162,7 +170,10 @@ class ResearchService:
         # except OSError as exc:
         #     logger.warning("Failed to write raw sources log file: %s", exc)
         try:
-            answer = await asyncio.to_thread(synthesize, clean_question, all_sources)
+            answer = await self.external_policy.call_sync(
+                "llm",
+                lambda: synthesize(clean_question, all_sources),
+            )
         except ProviderError:
             logger.exception("Synthesis provider failed")
 
@@ -204,16 +215,19 @@ class ResearchService:
             use_cache: bool = True,
     ) -> list[SourceFetchResult]:
         """Fetch all selected sources concurrently with graceful degradation."""
-        tasks = [
-            self._fetch_one_source(
-                source_type=source_type,
-                question=question,
-                use_cache=use_cache,
-            )
-            for source_type in source_names
-        ]
+        timeout = self.settings.per_source_timeout_seconds
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            tasks = [
+                self._fetch_one_source(
+                    source_type=source_type,
+                    question=question,
+                    use_cache=use_cache,
+                    client=client,
+                )
+                for source_type in source_names
+            ]
 
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+            results = await asyncio.gather(*tasks, return_exceptions=True)
 
         normalized: list[SourceFetchResult] = []
         for source_type, result in zip(source_names, results, strict=True):
@@ -242,6 +256,7 @@ class ResearchService:
             source_type: str,
             question: str,
             use_cache: bool,
+            client: httpx.AsyncClient,
     ) -> SourceFetchResult:
         start = time.perf_counter()
 
@@ -258,9 +273,9 @@ class ResearchService:
         fetcher = self._get_fetcher(source_type)
 
         try:
-            sources = await self._retry_async(
-                lambda: self._fetch_with_timeout(fetcher, question),
-                label=source_type,
+            sources = await self.external_policy.call_async(
+                source_type,
+                lambda: self._fetch_with_timeout(fetcher, question, client),
             )
         except Exception as exc:
             logger.warning(
@@ -304,6 +319,7 @@ class ResearchService:
             self,
             fetcher: Callable[..., Awaitable[list[Source]]],
             question: str,
+            client: httpx.AsyncClient,
     ) -> list[Source]:
         timeout = self.settings.per_source_timeout_seconds
 
@@ -311,6 +327,7 @@ class ResearchService:
             return await fetcher(
                 question,
                 max_results=self.settings.max_sources_per_query,
+                client=client,
             )
 
     async def _get_cached_sources(
@@ -335,39 +352,6 @@ class ResearchService:
             logger.info("Cache hit source=%s", source_type)
 
         return cached
-
-    async def _retry_async(
-            self,
-            operation: Callable[[], Awaitable[list[Source]]],
-            *,
-            label: str,
-    ) -> list[Source]:
-        delay = 0.5
-        last_error: Exception | None = None
-
-        for attempt in range(1, self.max_retries + 1):
-            try:
-                return await operation()
-            except (TimeoutError, ProviderError, OSError) as exc:
-                last_error = exc
-                logger.warning(
-                    "Retryable failure label=%s attempt=%d/%d error=%s",
-                    label,
-                    attempt,
-                    self.max_retries,
-                    exc,
-                )
-
-                if attempt == self.max_retries:
-                    break
-
-                await asyncio.sleep(delay)
-                delay *= 2
-
-        if last_error is not None:
-            raise last_error
-
-        raise RuntimeError(f"Retry failed without an exception for {label}")
 
     def _get_fetcher(
             self,

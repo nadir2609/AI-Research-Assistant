@@ -32,6 +32,7 @@ from ai import (
 )
 from ai.providers.base import LLMProvider, ProviderError
 from ai.sources import WebSearchProvider
+from src.services.external_policy import ExternalCallPolicy
 
 
 # --- offline fakes --------------------------------------------------------
@@ -120,15 +121,27 @@ class _OfflineSources:
 
 # --- live parallel fetcher ------------------------------------------------
 
+_POLICY = ExternalCallPolicy.defaults()
+
+
 async def fetch_all_sources_live(question: str) -> list[Source]:
     """Run the three fetchers concurrently and combine their results."""
     import httpx  # type: ignore
 
     async with httpx.AsyncClient(timeout=15.0) as client:
         results = await asyncio.gather(
-            fetch_wikipedia(question, max_results=2, client=client),
-            fetch_arxiv(question, max_results=2, client=client),
-            fetch_web(question, max_results=3, client=client),
+            _POLICY.call_async(
+                "wikipedia",
+                lambda: fetch_wikipedia(question, max_results=2, client=client),
+            ),
+            _POLICY.call_async(
+                "arxiv",
+                lambda: fetch_arxiv(question, max_results=2, client=client),
+            ),
+            _POLICY.call_async(
+                "web",
+                lambda: fetch_web(question, max_results=3, client=client),
+            ),
             return_exceptions=True,
         )
 
@@ -191,7 +204,13 @@ async def run_one(question: str, offline: bool, llm: LLMProvider | None) -> None
           f"{sum(1 for s in sources if s.origin == 'web')} web)\n")
 
     try:
-        answer = synthesize(question, sources, llm=llm)
+        if offline:
+            answer = synthesize(question, sources, llm=llm)
+        else:
+            answer = await _POLICY.call_sync(
+                "llm",
+                lambda: synthesize(question, sources, llm=llm),
+            )
     except (ProviderError, ValueError) as e:
         print(f"  ! synthesis failed: {e}", file=sys.stderr)
         return

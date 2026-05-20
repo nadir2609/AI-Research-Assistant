@@ -89,7 +89,11 @@ async def _build_service() -> tuple[ResearchService, bool]:
                 exc,
             )
 
-    service = ResearchService(settings=settings, repository=repository)
+    service = ResearchService(
+        settings=settings,
+        repository=repository,
+        max_retries=settings.external_max_retries,
+    )
     return service, db_connected
 
 async def _ask_async(

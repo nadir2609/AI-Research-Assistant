@@ -71,8 +71,13 @@ async def fetch_wikipedia(
     httpx = _require_httpx()
 
     own_client = client is None
+    # if own_client:
+    #     client = httpx.AsyncClient(timeout=timeout)
     if own_client:
-        client = httpx.AsyncClient(timeout=timeout)
+        client = httpx.AsyncClient(
+            timeout=timeout,
+            headers={"User-Agent": "AI-Research-Assistant (https://github.com)"}
+        )
 
     try:
         # Step 1: search for matching titles.
@@ -130,7 +135,7 @@ async def fetch_wikipedia(
 # arXiv
 # ---------------------------------------------------------------------------
 
-_ARXIV_URL = "http://export.arxiv.org/api/query"
+_ARXIV_URL = "https://export.arxiv.org/api/query"
 _ATOM_NS = "{http://www.w3.org/2005/Atom}"
 
 

@@ -18,6 +18,14 @@ _DEFAULT_LLM_BY_PROVIDER: Final[dict[LLMProvider, str]] = {
     "openai": "gpt-4o-mini",
     "gemini": "gemini-2.0-flash",
 }
+_LLM_PROVIDER_ALIASES: Final[dict[str, LLMProvider]] = {
+    "anthropic": "anthropic",
+    "claude": "anthropic",
+    "openai": "openai",
+    "gpt": "openai",
+    "gemini": "gemini",
+    "google": "gemini",
+}
 _VALID_LOG_LEVELS: Final[set[str]] = {
     "CRITICAL",
     "ERROR",
@@ -41,6 +49,7 @@ class Settings:
     cache_ttl_seconds: int
     per_source_timeout_seconds: float
     max_sources_per_query: int
+    database_url: str | None = None
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None
     google_api_key: str | None = None
@@ -54,12 +63,7 @@ class Settings:
         file_values = dotenv_values(env_path)
         merged = _merge_env(file_values)
 
-        llm_provider = _parse_choice(
-            merged,
-            "LLM_PROVIDER",
-            ("anthropic", "openai", "gemini"),
-            default="anthropic",
-        )
+        llm_provider = _parse_llm_provider(merged, default="anthropic")
         llm_model = _get_str(
             merged,
             "LLM_MODEL",
@@ -96,6 +100,7 @@ class Settings:
             cache_ttl_seconds=cache_ttl,
             per_source_timeout_seconds=per_source_timeout,
             max_sources_per_query=max_sources,
+            database_url=_get_optional(merged, "DATABASE_URL"),
             anthropic_api_key=_get_optional(merged, "ANTHROPIC_API_KEY"),
             openai_api_key=_get_optional(merged, "OPENAI_API_KEY"),
             google_api_key=_get_optional(merged, "GOOGLE_API_KEY"),
@@ -139,6 +144,7 @@ class Settings:
             "MAX_SOURCES_PER_QUERY": str(self.max_sources_per_query),
         }
         optional_values = {
+            "DATABASE_URL": self.database_url,
             "ANTHROPIC_API_KEY": self.anthropic_api_key,
             "OPENAI_API_KEY": self.openai_api_key,
             "GOOGLE_API_KEY": self.google_api_key,
@@ -224,6 +230,15 @@ def _parse_choice(
     if value not in allowed:
         raise SettingsError(f"{key} must be one of {allowed}, got {value!r}.")
     return value
+
+
+def _parse_llm_provider(values: dict[str, str], *, default: LLMProvider) -> LLMProvider:
+    raw = _get_str(values, "LLM_PROVIDER", default=default).strip().lower()
+    canonical = _LLM_PROVIDER_ALIASES.get(raw)
+    if canonical is None:
+        allowed = sorted(set(_LLM_PROVIDER_ALIASES))
+        raise SettingsError(f"LLM_PROVIDER must be one of {allowed}, got {raw!r}.")
+    return canonical
 
 
 @lru_cache(maxsize=1)

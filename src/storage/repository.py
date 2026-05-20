@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
-
+import json
 import asyncpg
 from ai.schemas import AnswerWithCitations, Source
 
@@ -82,7 +82,7 @@ class PostgresRepository:
         it is updated instead of inserted again.
         """
         query = query.lower().strip()
-        content = [source.model_dump() for source in sources]
+        content = json.dumps([source.model_dump() for source in sources])
 
         async with self.pool.acquire() as conn:
             await conn.execute(
@@ -128,7 +128,7 @@ class PostgresRepository:
                 """,
                 question,
                 result.answer,
-                citations,
+                json.dumps(citations),
             )
 
         logger.info("Final answer saved to history.")

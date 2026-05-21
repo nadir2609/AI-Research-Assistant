@@ -1,5 +1,6 @@
 import asyncio
 import time
+import logging
 from typing import Awaitable, Callable
 
 from ai.schemas import Source
@@ -143,8 +144,7 @@ class ResearchOrchestrator:
                 )
 
             else:
-                print(
-                    f"ERROR: {result.error}"
-                )
+                logger = logging.getLogger(__name__)
+                logger.warning("Source fetch failed: %s", result.error)
 
         return collected_sources

@@ -31,7 +31,7 @@ def test_source_rejects_empty_title():
 
 
 def test_source_is_frozen():
-    s = Source(title="t", url="u", snippet="s", origin="web")
+    s = Source(title="t", url="https://example.com", snippet="s", origin="web")
     with pytest.raises(Exception):
         s.title = "new"  # type: ignore
 

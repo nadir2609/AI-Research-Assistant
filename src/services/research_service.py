@@ -18,13 +18,15 @@ from src.services.external_policy import ExternalCallPolicy
 from src.storage.repository import PostgresRepository
 
 logger = logging.getLogger(__name__)
-# text_log_path = Path(__file__).resolve().parents[2] / "research_service.log"
-raw_answer = logging.getLogger("raw_answer_questions")
-raw_answer.setLevel(logging.INFO)
-raw_answer.propagate = False
-file_handler = logging.FileHandler(Path(__file__).resolve().parents[2] / "raw_answer_questions.log", encoding="utf-8")
+
+
+raw_answer_questions_from_sources = logging.getLogger("raw_answer_questions_from_sources")
+raw_answer_questions_from_sources.setLevel(logging.INFO)
+raw_answer_questions_from_sources.propagate = False
+file_handler = logging.FileHandler(Path(__file__).resolve().parents[2] / "raw_answer_questions_from_sources.log", encoding="utf-8")
 file_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s - %(message)s"))
-raw_answer.addHandler(file_handler)
+raw_answer_questions_from_sources.addHandler(file_handler)
+
 SourceName = Literal["wiki", "wikipedia", "arxiv", "web"]
 
 _SOURCE_ALIASES: dict[str, str] = {
@@ -159,16 +161,7 @@ class ResearchService:
             len(all_sources),
             degraded,
         )
-        raw_answer.info(f"question: {clean_question}, sources: {all_sources}")
-        # try:
-        #     log_path = Path(__file__).resolve().parents[2] / "research_service.log"
-        #     with log_path.open("a", encoding="utf-8") as log_file:
-        #         log_file.write(
-        #             f"{time.strftime('%Y-%m-%d %H:%M:%S')} "
-        #             f"Raw sources(before synthesize): {all_sources!r}\n"
-        #         )
-        # except OSError as exc:
-        #     logger.warning("Failed to write raw sources log file: %s", exc)
+        raw_answer_questions_from_sources.info(f"question: {clean_question}, sources: {all_sources}")
         try:
             answer = await self.external_policy.call_sync(
                 "llm",

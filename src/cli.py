@@ -29,6 +29,27 @@ def _parse_sources(value: str | None) -> list[str] | None:
     return parts or None
 
 
+# Allowed source aliases (kept small to avoid duplication with service layer)
+_CLI_ALLOWED_SOURCES = {"wiki", "wikipedia", "arxiv", "web"}
+
+
+def _validate_cli_sources(value: str | None) -> list[str] | None:
+    """Validate the --sources CLI option early and return parsed parts.
+
+    This provides immediate, user-friendly feedback rather than waiting for
+    the service layer to raise exceptions.
+    """
+    parts = _parse_sources(value)
+    if parts is None:
+        return None
+    invalid = [p for p in parts if p.lower() not in _CLI_ALLOWED_SOURCES]
+    if invalid:
+        raise click.BadParameter(
+            f"Unsupported sources: {', '.join(invalid)}. Allowed: wiki,arxiv,web"
+        )
+    return parts
+
+
 def _render_result(result: ResearchResult) -> str:
     lines: list[str] = [
         f"Q: {result.answer.question}",
@@ -153,7 +174,20 @@ def ask(
 
         python -m src.cli ask "What is photosynthesis?" --sources wiki,web
     """
-    question_text = " ".join(question)
+    question_text = " ".join(question).strip()
+    # Early CLI validation to avoid running async work when input is invalid.
+    if not question_text:
+        raise click.BadParameter("question must be non-empty")
+    MAX_QUESTION_CHARS = 1000
+    if len(question_text) > MAX_QUESTION_CHARS:
+        raise click.BadParameter(f"question too long: max {MAX_QUESTION_CHARS} chars")
+
+    # Validate sources early and translate to normalized list for the service.
+    try:
+        validated_sources = _validate_cli_sources(sources)
+    except click.BadParameter:
+        # Re-raise so click prints the parameter error correctly.
+        raise
     exit_code = asyncio.run(
         _ask_async(
             question_text,

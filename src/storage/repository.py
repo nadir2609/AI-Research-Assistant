@@ -43,7 +43,15 @@ class PostgresRepository:
             A list of `Source` objects if a valid cache entry exists and is not
             expired; otherwise `None`.
         """
-        query = query.lower().strip()
+        # Validate inputs
+        ALLOWED_SOURCES = {"wikipedia", "arxiv", "web"}
+        if source_type not in ALLOWED_SOURCES:
+            raise ValueError(f"Unsupported source_type: {source_type}")
+        query = (query or "").lower().strip()
+        if not query:
+            return None
+        if len(query) > 2000:
+            raise ValueError("query too long")
 
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow(
@@ -81,8 +89,23 @@ class PostgresRepository:
         If a row with the same `(source_type, query_text)` already exists,
         it is updated instead of inserted again.
         """
-        query = query.lower().strip()
-        content = json.dumps([source.model_dump() for source in sources])
+        # Validate inputs
+        ALLOWED_SOURCES = {"wikipedia", "arxiv", "web"}
+        if source_type not in ALLOWED_SOURCES:
+            raise ValueError(f"Unsupported source_type: {source_type}")
+        query = (query or "").lower().strip()
+        if not query:
+            raise ValueError("query must be non-empty")
+        if len(query) > 2000:
+            raise ValueError("query too long")
+
+        # Ensure sources are serializable and not excessively large
+        content_list = [source.model_dump() for source in sources]
+        # pass the list directly so callers (and tests) receive Python structures
+        content = content_list
+        # approximate size check on serialized JSON to avoid overly large payloads
+        if len(json.dumps(content_list)) > 1_000_000:
+            raise ValueError("source cache content too large to store")
 
         async with self.pool.acquire() as conn:
             await conn.execute(
@@ -110,6 +133,12 @@ class PostgresRepository:
         The citations are stored as JSON, so the full response can be reviewed
         later or displayed in a history screen.
         """
+        # Basic validation to avoid inserting pathological values
+        if not question or not question.strip():
+            raise ValueError("question must be non-empty")
+        if len(question) > 5000:
+            raise ValueError("question too long")
+
         citations = [
             {
                 "index": citation.index,
@@ -128,7 +157,7 @@ class PostgresRepository:
                 """,
                 question,
                 result.answer,
-                json.dumps(citations),
+                citations,
             )
 
         logger.info("Final answer saved to history.")

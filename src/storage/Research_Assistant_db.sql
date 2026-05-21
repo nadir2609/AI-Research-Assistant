@@ -1,6 +1,6 @@
-CREATE DATABASE Research_Assistan_db;
+CREATE DATABASE Research_Assistant_db;
 
-\c Research_Assistan_db
+\c Research_Assistant_db
 
 CREATE TABLE IF NOT EXISTS research_cache (
     id SERIAL PRIMARY KEY,

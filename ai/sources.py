@@ -135,6 +135,12 @@ async def fetch_wikipedia(
 # arXiv
 # ---------------------------------------------------------------------------
 
+<<<<<<< Updated upstream
+=======
+# i changed http to https
+# before http://export.arxiv.org/api/query
+# after https://export.arxiv.org/api/query
+>>>>>>> Stashed changes
 _ARXIV_URL = "https://export.arxiv.org/api/query"
 _ATOM_NS = "{http://www.w3.org/2005/Atom}"
 

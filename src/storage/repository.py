@@ -4,6 +4,7 @@ from typing import List, Optional
 import json
 import asyncpg
 from ai.schemas import AnswerWithCitations, Source
+from src.storage.cache_keys import canonicalize_query, validate_source_type
 
 logger = logging.getLogger(__name__)
 
@@ -17,18 +18,32 @@ class PostgresRepository:
     - Final answers and citations in `research_history`
     """
 
-    def __init__(self, pool: asyncpg.Pool, ttl_hours: int = 24):
+    def __init__(
+        self,
+        pool: asyncpg.Pool,
+        *,
+        ttl_seconds: int | None = None,
+        ttl_hours: int | None = None,
+    ):
         """
         Initialize the PostgresRepository.
 
         Args:
             pool: An asyncpg connection pool for database access.
-            ttl_hours: Time-to-live in hours for cached entries. Cache entries
-                older than this will be considered expired and ignored.
-                Defaults to 24 hours.
+            ttl_seconds: Cache TTL in seconds (preferred).
+            ttl_hours: Deprecated alias; used when ``ttl_seconds`` is omitted.
         """
         self.pool = pool
-        self.ttl_hours = ttl_hours
+        if ttl_seconds is not None:
+            if ttl_seconds < 1:
+                raise ValueError("ttl_seconds must be >= 1")
+            self._ttl = timedelta(seconds=ttl_seconds)
+        elif ttl_hours is not None:
+            if ttl_hours < 1:
+                raise ValueError("ttl_hours must be >= 1")
+            self._ttl = timedelta(hours=ttl_hours)
+        else:
+            self._ttl = timedelta(hours=24)
 
     async def get_cached_sources(
         self, source_type: str, query: str
@@ -43,7 +58,16 @@ class PostgresRepository:
             A list of `Source` objects if a valid cache entry exists and is not
             expired; otherwise `None`.
         """
+<<<<<<< Updated upstream
         query = query.lower().strip()
+=======
+        validate_source_type(source_type)
+        query = canonicalize_query(query)
+        if not query:
+            return None
+        if len(query) > 2000:
+            raise ValueError("query too long")
+>>>>>>> Stashed changes
 
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow(
@@ -62,7 +86,7 @@ class PostgresRepository:
 
         # Reject expired cache entries.
         age = datetime.now(timezone.utc) - row["created_at"]
-        if age >= timedelta(hours=self.ttl_hours):
+        if age >= self._ttl:
             logger.info("Cache expired for %s:%s", source_type, query)
             return None
 
@@ -81,8 +105,25 @@ class PostgresRepository:
         If a row with the same `(source_type, query_text)` already exists,
         it is updated instead of inserted again.
         """
+<<<<<<< Updated upstream
         query = query.lower().strip()
         content = json.dumps([source.model_dump() for source in sources])
+=======
+        validate_source_type(source_type)
+        query = canonicalize_query(query)
+        if not query:
+            raise ValueError("query must be non-empty")
+        if len(query) > 2000:
+            raise ValueError("query too long")
+
+        # Ensure sources are serializable and not excessively large
+        content_list = [source.model_dump() for source in sources]
+        # pass the list directly so callers (and tests) receive Python structures
+        content = content_list
+        # approximate size check on serialized JSON to avoid overly large payloads
+        if len(json.dumps(content_list)) > 1_000_000:
+            raise ValueError("source cache content too large to store")
+>>>>>>> Stashed changes
 
         async with self.pool.acquire() as conn:
             await conn.execute(
@@ -128,7 +169,11 @@ class PostgresRepository:
                 """,
                 question,
                 result.answer,
+<<<<<<< Updated upstream
                 json.dumps(citations),
+=======
+                json.dumps(citations),  # <-- SERIALIZE TO JSON STRING
+>>>>>>> Stashed changes
             )
 
         logger.info("Final answer saved to history.")

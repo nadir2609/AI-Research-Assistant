@@ -67,6 +67,16 @@ def _render_result(result: ResearchResult) -> str:
             f"{fetch_result.elapsed_seconds:.2f}s"
         )
 
+    lines.append("")  # blank line
+    lines.append("Fetched sources detail (global index as seen by LLM):")
+    global_idx = 0
+    for fr in result.fetch_results:
+        for src in fr.sources:
+            global_idx += 1
+            title = sanitize_text(src.title, max_length=500)
+            url = sanitize_text(src.url, max_length=2048)
+            lines.append(f"  [{global_idx}] ({fr.source_type}) {title}")
+            lines.append(f"      {url}")
     if result.degraded:
         lines.append("")
         lines.append("Warning: answer was produced with partial source failures.")

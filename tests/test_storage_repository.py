@@ -98,8 +98,8 @@ async def test_get_cached_sources_expired_returns_none():
 @pytest.mark.asyncio
 async def test_save_source_cache_calls_execute_with_serialized_content():
     # Arrange
-    src1 = Source(title="T1", url="u1", snippet="s1", origin="web")
-    src2 = Source(title="T2", url="u2", snippet="s2", origin="wikipedia")
+    src1 = Source(title="T1", url="https://example.com/1", snippet="s1", origin="web")
+    src2 = Source(title="T2", url="https://example.com/2", snippet="s2", origin="wikipedia")
     content_expected = [src1.model_dump(), src2.model_dump()]
 
     # No fetchrow needed for save, but prepare pool/conn to capture execute calls

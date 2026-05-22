@@ -6,10 +6,21 @@ from typing import NoReturn
 
 import click
 
+from ai.providers.base import ProviderError
+
 from src.config import SettingsError, configure_environment
+from src.services.external_policy import is_quota_exhausted
 from src.services.research_service import ResearchResult, ResearchService
 from src.storage.database import db
 from src.storage.repository import PostgresRepository
+from src.storage.source_cache import build_source_cache
+from src.validation import (
+    MAX_QUESTION_CHARS,
+    ValidationError,
+    sanitize_text,
+    validate_question,
+    validate_source_names,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -21,19 +32,22 @@ def _configure_logging(level: str) -> None:
     )
 
 
-def _parse_sources(value: str | None) -> list[str] | None:
+def _parse_sources_option(value: str | None) -> list[str] | None:
+    """Split comma-separated --sources into raw tokens."""
     if value is None:
         return None
-
     parts = [part.strip() for part in value.split(",") if part.strip()]
     return parts or None
 
 
 def _render_result(result: ResearchResult) -> str:
+    question = sanitize_text(result.answer.question, max_length=MAX_QUESTION_CHARS)
+    answer_text = sanitize_text(result.answer.answer, max_length=32_000)
+
     lines: list[str] = [
-        f"Q: {result.answer.question}",
+        f"Q: {question}",
         "",
-        f"A: {result.answer.answer}",
+        f"A: {answer_text}",
         "",
     ]
 
@@ -41,10 +55,12 @@ def _render_result(result: ResearchResult) -> str:
         lines.append("References:")
         for citation in result.answer.citations:
             source = citation.source
+            title = sanitize_text(source.title, max_length=500)
+            url = sanitize_text(source.url, max_length=2048)
             lines.append(
-                f"  [{citation.index}] ({source.origin}) {source.title}"
+                f"  [{citation.index}] ({source.origin}) {title}"
             )
-            lines.append(f"      {source.url}")
+            lines.append(f"      {url}")
     else:
         lines.append("References: none cited by the model.")
 
@@ -80,17 +96,26 @@ async def _build_service() -> tuple[ResearchService, bool]:
         try:
             pool = await db.connect(settings.database_url)
             if pool is not None:
-                ttl_hours = max(1, settings.cache_ttl_seconds // 3600)
-                repository = PostgresRepository(pool=pool, ttl_hours=ttl_hours)
+                repository = PostgresRepository(
+                    pool=pool,
+                    ttl_seconds=settings.cache_ttl_seconds,
+                )
                 db_connected = True
         except Exception as exc:
             logger.warning(
-                "Database unavailable; continuing without persistent cache: %s",
+                "Database unavailable; continuing without PostgreSQL cache: %s",
                 exc,
             )
 
+    source_cache = build_source_cache(
+        cache_dir=settings.cache_dir,
+        ttl_seconds=settings.cache_ttl_seconds,
+        repository=repository,
+    )
+
     service = ResearchService(
         settings=settings,
+        source_cache=source_cache,
         repository=repository,
         max_retries=settings.external_max_retries,
     )
@@ -99,7 +124,7 @@ async def _build_service() -> tuple[ResearchService, bool]:
 async def _ask_async(
         question: str,
         *,
-        sources: str | None,
+        source_names: list[str] | None,
         no_cache: bool,
 ) -> int:
     service, db_connected = await _build_service()
@@ -107,12 +132,25 @@ async def _ask_async(
     try:
         result = await service.ask(
             question,
-            source_names=_parse_sources(sources),
+            source_names=source_names,
             use_cache=not no_cache,
         )
-    except (ValueError, SettingsError) as exc:
+    except (ValidationError, ValueError, SettingsError) as exc:
         click.echo(f"Error: {exc}", err=True)
         return 2
+    except ProviderError as exc:
+        if is_quota_exhausted(exc):
+            click.echo(
+                "LLM quota exhausted for the configured provider/model. "
+                "Wait for the daily limit to reset, enable billing in Google AI Studio, "
+                "switch LLM_MODEL (e.g. gemini-2.0-flash), or set LLM_PROVIDER to "
+                "anthropic/openai with a valid API key.",
+                err=True,
+            )
+            return 1
+        logger.exception("Research request failed")
+        click.echo(f"Research failed: {exc}", err=True)
+        return 1
     except Exception as exc:
         logger.exception("Research request failed")
         click.echo(f"Research failed: {exc}", err=True)
@@ -153,11 +191,17 @@ def ask(
 
         python -m src.cli ask "What is photosynthesis?" --sources wiki,web
     """
-    question_text = " ".join(question)
+    question_text = " ".join(question).strip()
+    try:
+        validate_question(question_text, max_chars=MAX_QUESTION_CHARS)
+        validated_sources = validate_source_names(_parse_sources_option(sources))
+    except ValidationError as exc:
+        raise click.BadParameter(str(exc)) from exc
+
     exit_code = asyncio.run(
         _ask_async(
             question_text,
-            sources=sources,
+            source_names=validated_sources,
             no_cache=no_cache,
         )
     )

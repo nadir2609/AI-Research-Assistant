@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Final, Literal
 
 from dotenv import dotenv_values
+from urllib.parse import urlparse
 
 LLMProvider = Literal["anthropic", "openai", "gemini"]
 WebSearchProvider = Literal["tavily", "serper", "duckduckgo"]
@@ -176,6 +177,25 @@ class Settings:
             raise SettingsError("WEB_SEARCH_PROVIDER=tavily requires TAVILY_API_KEY.")
         if self.web_search_provider == "serper" and not self.serper_api_key:
             raise SettingsError("WEB_SEARCH_PROVIDER=serper requires SERPER_API_KEY.")
+
+        # Basic validation for DATABASE_URL: must be a postgres URL when provided
+        if self.database_url:
+            parsed = urlparse(self.database_url)
+            if parsed.scheme not in ("postgres", "postgresql"):
+                raise SettingsError(
+                    "DATABASE_URL must be a PostgreSQL URL (postgres:// or postgresql://)"
+                )
+
+        # Validate cache directory if it exists: it must be a directory and writable.
+        try:
+            if self.cache_dir.exists():
+                if not self.cache_dir.is_dir():
+                    raise SettingsError(f"CACHE_DIR exists but is not a directory: {self.cache_dir}")
+                if not os.access(self.cache_dir, os.W_OK):
+                    raise SettingsError(f"CACHE_DIR is not writable: {self.cache_dir}")
+        except OSError:
+            # If checking the path fails for OS reasons, raise a settings error.
+            raise SettingsError(f"Unable to access CACHE_DIR: {self.cache_dir}")
 
     def as_env(self) -> dict[str, str]:
         env = {

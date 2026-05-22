@@ -100,9 +100,13 @@ class Settings:
             default=10.0,
             minimum=0.1,
         )
-        max_sources = _get_int(merged, "MAX_SOURCES_PER_QUERY", default=3, minimum=1)
-        max_parallel = _get_int(merged, "MAX_PARALLEL_EXTERNAL_CALLS", default=3, minimum=1)
-        external_max_retries = _get_int(merged, "EXTERNAL_MAX_RETRIES", default=3, minimum=1)
+        max_sources = _get_int(merged, "MAX_SOURCES_PER_QUERY", default=1, minimum=1)
+        max_parallel = _get_int(
+            merged, "MAX_PARALLEL_EXTERNAL_CALLS", default=3, minimum=1
+        )
+        external_max_retries = _get_int(
+            merged, "EXTERNAL_MAX_RETRIES", default=3, minimum=1
+        )
         retry_base_delay = _get_float(
             merged,
             "RETRY_BASE_DELAY_SECONDS",
@@ -164,11 +168,15 @@ class Settings:
             raise SettingsError(
                 "LLM_PROVIDER=anthropic requires ANTHROPIC_API_KEY (or LLM_API_KEY)."
             )
-        if self.llm_provider == "openai" and not (self.openai_api_key or self.llm_api_key):
+        if self.llm_provider == "openai" and not (
+            self.openai_api_key or self.llm_api_key
+        ):
             raise SettingsError(
                 "LLM_PROVIDER=openai requires OPENAI_API_KEY (or LLM_API_KEY)."
             )
-        if self.llm_provider == "gemini" and not (self.google_api_key or self.llm_api_key):
+        if self.llm_provider == "gemini" and not (
+            self.google_api_key or self.llm_api_key
+        ):
             raise SettingsError(
                 "LLM_PROVIDER=gemini requires GOOGLE_API_KEY (or LLM_API_KEY)."
             )
@@ -190,7 +198,9 @@ class Settings:
         try:
             if self.cache_dir.exists():
                 if not self.cache_dir.is_dir():
-                    raise SettingsError(f"CACHE_DIR exists but is not a directory: {self.cache_dir}")
+                    raise SettingsError(
+                        f"CACHE_DIR exists but is not a directory: {self.cache_dir}"
+                    )
                 if not os.access(self.cache_dir, os.W_OK):
                     raise SettingsError(f"CACHE_DIR is not writable: {self.cache_dir}")
         except OSError:

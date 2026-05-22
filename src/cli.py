@@ -8,12 +8,10 @@ import click
 
 from ai.providers.base import ProviderError
 
-from src.config import SettingsError, configure_environment
+from src.config import SettingsError
+from src.core.researcher import create_researcher
 from src.services.external_policy import is_quota_exhausted
-from src.services.research_service import ResearchResult, ResearchService
-from src.storage.database import db
-from src.storage.repository import PostgresRepository
-from src.storage.source_cache import build_source_cache
+from src.services.research_service import ResearchResult
 from src.validation import (
     MAX_QUESTION_CHARS,
     ValidationError,
@@ -23,13 +21,6 @@ from src.validation import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-def _configure_logging(level: str) -> None:
-    logging.basicConfig(
-        level=getattr(logging, level.upper(), logging.INFO),
-        format="%(asctime)s %(levelname)s %(name)s - %(message)s",
-    )
 
 
 def _parse_sources_option(value: str | None) -> list[str] | None:
@@ -57,9 +48,7 @@ def _render_result(result: ResearchResult) -> str:
             source = citation.source
             title = sanitize_text(source.title, max_length=500)
             url = sanitize_text(source.url, max_length=2048)
-            lines.append(
-                f"  [{citation.index}] ({source.origin}) {title}"
-            )
+            lines.append(f"  [{citation.index}] ({source.origin}) {title}")
             lines.append(f"      {url}")
     else:
         lines.append("References: none cited by the model.")
@@ -85,55 +74,24 @@ def _render_result(result: ResearchResult) -> str:
     return "\n".join(lines)
 
 
-async def _build_service() -> tuple[ResearchService, bool]:
-    settings = configure_environment()
-    _configure_logging(settings.log_level)
-
-    repository: PostgresRepository | None = None
-    db_connected = False
-
-    if settings.database_url:
-        try:
-            pool = await db.connect(settings.database_url)
-            if pool is not None:
-                repository = PostgresRepository(
-                    pool=pool,
-                    ttl_seconds=settings.cache_ttl_seconds,
-                )
-                db_connected = True
-        except Exception as exc:
-            logger.warning(
-                "Database unavailable; continuing without PostgreSQL cache: %s",
-                exc,
-            )
-
-    source_cache = build_source_cache(
-        cache_dir=settings.cache_dir,
-        ttl_seconds=settings.cache_ttl_seconds,
-        repository=repository,
-    )
-
-    service = ResearchService(
-        settings=settings,
-        source_cache=source_cache,
-        repository=repository,
-        max_retries=settings.external_max_retries,
-    )
-    return service, db_connected
-
 async def _ask_async(
-        question: str,
-        *,
-        source_names: list[str] | None,
-        no_cache: bool,
+    question: str,
+    *,
+    source_names: list[str] | None,
+    no_cache: bool,
 ) -> int:
-    service, db_connected = await _build_service()
+    researcher = None
+    try:
+        researcher = await create_researcher()
+    except SettingsError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        return 2
 
     try:
-        result = await service.ask(
+        result = await researcher.ask(
             question,
             source_names=source_names,
-            use_cache=not no_cache,
+            no_cache=no_cache,
         )
     except (ValidationError, ValueError, SettingsError) as exc:
         click.echo(f"Error: {exc}", err=True)
@@ -156,8 +114,8 @@ async def _ask_async(
         click.echo(f"Research failed: {exc}", err=True)
         return 1
     finally:
-        if db_connected:
-            await db.disconnect()
+        if researcher is not None:
+            await researcher.close()
 
     click.echo(_render_result(result))
     return 0
@@ -180,16 +138,16 @@ def cli() -> None:
     help="Bypass cache reads for this request.",
 )
 def ask(
-        question: tuple[str, ...],
-        sources: str | None,
-        no_cache: bool,
+    question: tuple[str, ...],
+    sources: str | None,
+    no_cache: bool,
 ) -> None:
     """
     Ask a research question.
 
     Example:
 
-        python -m src.cli ask "What is photosynthesis?" --sources wiki,web
+        python -m researcher ask "What is photosynthesis?" --sources wiki,web
     """
     question_text = " ".join(question).strip()
     try:

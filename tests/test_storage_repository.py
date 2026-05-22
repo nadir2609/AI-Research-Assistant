@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+import json
 
 from ai.schemas import AnswerWithCitations, Citation, Source
 from src.storage.repository import PostgresRepository
@@ -144,7 +145,7 @@ async def test_save_final_answer_inserts_history_row():
     assert call_args[1] == "Q"
     assert call_args[2] == "An answer [1]"
     # citations parameter should be a list of flattened dicts
-    assert isinstance(call_args[3], list)
-    assert call_args[3] == [
+    assert isinstance(call_args[3], str)  # Now it's a JSON string
+    assert json.loads(call_args[3]) == [
         {"index": 1, "title": s.title, "url": s.url, "origin": s.origin}
     ]

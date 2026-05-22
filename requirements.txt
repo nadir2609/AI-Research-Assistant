@@ -14,7 +14,7 @@ google-genai; extra == "gemini"
 # Pick ONE web search provider:
 # Tavily and Serper are accessed via plain httpx (already required) — no extra package.
 duckduckgo-search; extra == "duckduckgo"
-duckduckgo-search
+ddgs
 
 # HTTP (sync)
 requests

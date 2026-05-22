@@ -130,9 +130,7 @@ class ExternalCallPolicy:
 
         if not isinstance(settings, Settings):
             raise TypeError("settings must be a Settings instance.")
-        retries = (
-            max_retries if max_retries is not None else settings.external_max_retries
-        )
+        retries = max_retries if max_retries is not None else settings.external_max_retries
         return cls(
             max_parallel=settings.max_parallel_external_calls,
             rate_limits={
@@ -183,6 +181,8 @@ class ExternalCallPolicy:
                     return await operation()
             except (TimeoutError, asyncio.TimeoutError, ProviderError, OSError) as exc:
                 last_error = exc
+                if is_quota_exhausted(exc):
+                    break
                 if attempt == self._max_retries:
                     break
                 delay = min(self._base_delay * (2 ** (attempt - 1)), self._max_delay)
@@ -218,6 +218,24 @@ class ExternalCallPolicy:
 
 
 _RETRY_AFTER_RE = re.compile(r"retry-?after[:\s]+(\d+)", re.IGNORECASE)
+_RETRY_IN_SECONDS_RE = re.compile(
+    r"please retry in\s+(\d+(?:\.\d+)?)\s*s",
+    re.IGNORECASE,
+)
+
+
+def is_quota_exhausted(exc: Exception) -> bool:
+    """True when the provider reports a billing/plan quota cap (not a short backoff)."""
+    msg = str(exc).lower()
+    if "quota exceeded" in msg or "quota failure" in msg:
+        return True
+    if "resource_exhausted" in msg and (
+        "free_tier" in msg
+        or "generate_content_free_tier" in msg
+        or "quota" in msg
+    ):
+        return True
+    return False
 
 
 def _get_retry_after_seconds(exc: Exception) -> float | None:
@@ -233,12 +251,13 @@ def _get_retry_after_seconds(exc: Exception) -> float | None:
                     pass
 
     text = str(exc)
-    match = _RETRY_AFTER_RE.search(text)
-    if match:
-        try:
-            return float(match.group(1))
-        except ValueError:
-            return None
+    for pattern in (_RETRY_AFTER_RE, _RETRY_IN_SECONDS_RE):
+        match = pattern.search(text)
+        if match:
+            try:
+                return float(match.group(1))
+            except ValueError:
+                return None
     return None
 
 
@@ -248,19 +267,3 @@ def _looks_rate_limited(exc: Exception) -> bool:
         return True
     msg = str(exc).lower()
     return "429" in msg or "rate limit" in msg or "too many requests" in msg
-
-
-_QUOTA_HINTS = (
-    "quota",
-    "insufficient_quota",
-    "rate limit",
-    "billing",
-    "exceeded",
-    "capacity",
-)
-
-
-def is_quota_exhausted(exc: Exception) -> bool:
-    """Best-effort check for provider quota exhaustion messages."""
-    message = str(exc).lower()
-    return any(hint in message for hint in _QUOTA_HINTS)

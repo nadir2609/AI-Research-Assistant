@@ -60,7 +60,12 @@ class ResearchOrchestrator:
         """Fetch all named sources in parallel via asyncio.gather."""
         timeout = self.settings.per_source_timeout_seconds
         headers = {"User-Agent": "Research-Assistant/1.0 (+https://github.com/nadir2609/AI-Research-Assistant)"}
-        async with httpx.AsyncClient(timeout=timeout, headers=headers) as client:
+        # follow_redirects: arXiv (http→https 301) and similar without editing ai/sources.py
+        async with httpx.AsyncClient(
+            timeout=timeout,
+            headers=headers,
+            follow_redirects=True,
+        ) as client:
             tasks = [
                 self._fetch_one_live(source_type, question, client)
                 for source_type in source_names

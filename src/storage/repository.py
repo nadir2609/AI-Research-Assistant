@@ -89,12 +89,13 @@ class PostgresRepository:
 
         logger.info("Cache hit for %s:%s", source_type, query)
 
-        # `content` is stored as JSONB in the database, so we convert it back
-        # into Python dictionaries and then rebuild `Source` objects.
-        return [Source(**item) for item in row["content"]]
+        raw = row["content"]
+        if isinstance(raw, str):
+            raw = json.loads(raw)
+        return [Source(**item) for item in raw]
 
     async def save_source_cache(
-            self, source_type: str, query: str, sources: List[Source]
+        self, source_type: str, query: str, sources: List[Source]
     ) -> None:
         """
         Save source results in `research_cache`.
@@ -111,20 +112,17 @@ class PostgresRepository:
             raise ValueError("query too long")
 
         content_list = [source.model_dump() for source in sources]
-        # approximate size check on serialized JSON to avoid overly large payloads
-        if len(json.dumps(content_list)) > 1_000_000:
-            raise ValueError("source cache content too large to store")
-
-        # Keep as JSON string for database storage
         content = json.dumps(content_list)
+        if len(content) > 1_000_000:
+            raise ValueError("source cache content too large to store")
 
         async with self.pool.acquire() as conn:
             await conn.execute(
                 """
                 INSERT INTO research_cache (source_type, query_text, content, created_at)
-                VALUES ($1, $2, $3, CURRENT_TIMESTAMP) ON CONFLICT (source_type, query_text)
-                DO
-                UPDATE SET
+                VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+                ON CONFLICT (source_type, query_text)
+                DO UPDATE SET
                     content = EXCLUDED.content,
                     created_at = CURRENT_TIMESTAMP
                 """,
@@ -144,8 +142,6 @@ class PostgresRepository:
         The citations are stored as JSON, so the full response can be reviewed
         later or displayed in a history screen.
         """
-        if not question or not question.strip():
-            raise ValueError("question must be non-empty")
         citations = [
             {
                 "index": citation.index,

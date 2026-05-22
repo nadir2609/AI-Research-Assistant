@@ -1,5 +1,3 @@
-<<<<<<< Updated upstream
-=======
 """Concurrent source fetching for the research pipeline.
 
 Owns asyncio.gather, shared httpx client, per-source timeouts, and retries
@@ -174,4 +172,3 @@ def _get_fetcher(source_type: str) -> Callable[..., Awaitable[list[Source]]]:
     if fetcher is None:
         raise ValueError(f"Unsupported source type: {source_type!r}")
     return fetcher
->>>>>>> Stashed changes

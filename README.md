@@ -91,6 +91,26 @@ Full rubric in **`SOFTWARE_PROJECT.pdf`** §8.
 
 ---
 
+## Topic 4 quick start (research assistant)
+
+CLI:
+
+```bash
+python -m researcher ask "What is photosynthesis?" --sources wiki,arxiv
+```
+
+HTTP API:
+
+```bash
+uvicorn src.api:app --reload
+```
+
+```bash
+curl -X POST http://localhost:8000/ask ^
+  -H "Content-Type: application/json" ^
+  -d "{\"question\":\"What is photosynthesis?\",\"sources\":[\"wiki\",\"arxiv\"],\"no_cache\":false}"
+```
+
 **Questions?** Open an issue against the course-wide repo or email the instructor. Do not delay on a blocker.
 
 Good luck. Build something you would actually ship.

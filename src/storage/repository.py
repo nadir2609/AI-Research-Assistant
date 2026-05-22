@@ -58,16 +58,13 @@ class PostgresRepository:
             A list of `Source` objects if a valid cache entry exists and is not
             expired; otherwise `None`.
         """
-<<<<<<< Updated upstream
         query = query.lower().strip()
-=======
         validate_source_type(source_type)
         query = canonicalize_query(query)
         if not query:
             return None
         if len(query) > 2000:
             raise ValueError("query too long")
->>>>>>> Stashed changes
 
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow(
@@ -105,10 +102,8 @@ class PostgresRepository:
         If a row with the same `(source_type, query_text)` already exists,
         it is updated instead of inserted again.
         """
-<<<<<<< Updated upstream
         query = query.lower().strip()
         content = json.dumps([source.model_dump() for source in sources])
-=======
         validate_source_type(source_type)
         query = canonicalize_query(query)
         if not query:
@@ -123,7 +118,6 @@ class PostgresRepository:
         # approximate size check on serialized JSON to avoid overly large payloads
         if len(json.dumps(content_list)) > 1_000_000:
             raise ValueError("source cache content too large to store")
->>>>>>> Stashed changes
 
         async with self.pool.acquire() as conn:
             await conn.execute(
@@ -169,11 +163,7 @@ class PostgresRepository:
                 """,
                 question,
                 result.answer,
-<<<<<<< Updated upstream
-                json.dumps(citations),
-=======
                 json.dumps(citations),  # <-- SERIALIZE TO JSON STRING
->>>>>>> Stashed changes
             )
 
         logger.info("Final answer saved to history.")

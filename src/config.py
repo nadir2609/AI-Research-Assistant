@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Final, Literal
 
 from dotenv import dotenv_values
+from urllib.parse import urlparse
 
 LLMProvider = Literal["anthropic", "openai", "gemini"]
 WebSearchProvider = Literal["tavily", "serper", "duckduckgo"]
@@ -49,6 +50,16 @@ class Settings:
     cache_ttl_seconds: int
     per_source_timeout_seconds: float
     max_sources_per_query: int
+    max_parallel_external_calls: int
+    external_max_retries: int
+    retry_base_delay_seconds: float
+    retry_max_delay_seconds: float
+    rate_limit_backoff_seconds: float
+    rate_limit_burst: int
+    wikipedia_rps: float
+    arxiv_rps: float
+    web_rps: float
+    llm_rps: float
     database_url: str | None = None
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None
@@ -89,7 +100,36 @@ class Settings:
             default=10.0,
             minimum=0.1,
         )
-        max_sources = _get_int(merged, "MAX_SOURCES_PER_QUERY", default=3, minimum=1)
+        max_sources = _get_int(merged, "MAX_SOURCES_PER_QUERY", default=1, minimum=1)
+        max_parallel = _get_int(
+            merged, "MAX_PARALLEL_EXTERNAL_CALLS", default=3, minimum=1
+        )
+        external_max_retries = _get_int(
+            merged, "EXTERNAL_MAX_RETRIES", default=3, minimum=1
+        )
+        retry_base_delay = _get_float(
+            merged,
+            "RETRY_BASE_DELAY_SECONDS",
+            default=0.5,
+            minimum=0.05,
+        )
+        retry_max_delay = _get_float(
+            merged,
+            "RETRY_MAX_DELAY_SECONDS",
+            default=8.0,
+            minimum=0.1,
+        )
+        rate_limit_backoff = _get_float(
+            merged,
+            "RATE_LIMIT_BACKOFF_SECONDS",
+            default=2.0,
+            minimum=0.1,
+        )
+        rate_limit_burst = _get_int(merged, "RATE_LIMIT_BURST", default=2, minimum=1)
+        wikipedia_rps = _get_float(merged, "WIKIPEDIA_RPS", default=2.0, minimum=0.1)
+        arxiv_rps = _get_float(merged, "ARXIV_RPS", default=1.0, minimum=0.1)
+        web_rps = _get_float(merged, "WEB_RPS", default=1.0, minimum=0.1)
+        llm_rps = _get_float(merged, "LLM_RPS", default=1.0, minimum=0.1)
 
         settings = cls(
             llm_provider=llm_provider,
@@ -100,6 +140,16 @@ class Settings:
             cache_ttl_seconds=cache_ttl,
             per_source_timeout_seconds=per_source_timeout,
             max_sources_per_query=max_sources,
+            max_parallel_external_calls=max_parallel,
+            external_max_retries=external_max_retries,
+            retry_base_delay_seconds=retry_base_delay,
+            retry_max_delay_seconds=retry_max_delay,
+            rate_limit_backoff_seconds=rate_limit_backoff,
+            rate_limit_burst=rate_limit_burst,
+            wikipedia_rps=wikipedia_rps,
+            arxiv_rps=arxiv_rps,
+            web_rps=web_rps,
+            llm_rps=llm_rps,
             database_url=_get_optional(merged, "DATABASE_URL"),
             anthropic_api_key=_get_optional(merged, "ANTHROPIC_API_KEY"),
             openai_api_key=_get_optional(merged, "OPENAI_API_KEY"),
@@ -118,11 +168,15 @@ class Settings:
             raise SettingsError(
                 "LLM_PROVIDER=anthropic requires ANTHROPIC_API_KEY (or LLM_API_KEY)."
             )
-        if self.llm_provider == "openai" and not (self.openai_api_key or self.llm_api_key):
+        if self.llm_provider == "openai" and not (
+            self.openai_api_key or self.llm_api_key
+        ):
             raise SettingsError(
                 "LLM_PROVIDER=openai requires OPENAI_API_KEY (or LLM_API_KEY)."
             )
-        if self.llm_provider == "gemini" and not (self.google_api_key or self.llm_api_key):
+        if self.llm_provider == "gemini" and not (
+            self.google_api_key or self.llm_api_key
+        ):
             raise SettingsError(
                 "LLM_PROVIDER=gemini requires GOOGLE_API_KEY (or LLM_API_KEY)."
             )
@@ -131,6 +185,27 @@ class Settings:
             raise SettingsError("WEB_SEARCH_PROVIDER=tavily requires TAVILY_API_KEY.")
         if self.web_search_provider == "serper" and not self.serper_api_key:
             raise SettingsError("WEB_SEARCH_PROVIDER=serper requires SERPER_API_KEY.")
+
+        # Basic validation for DATABASE_URL: must be a postgres URL when provided
+        if self.database_url:
+            parsed = urlparse(self.database_url)
+            if parsed.scheme not in ("postgres", "postgresql"):
+                raise SettingsError(
+                    "DATABASE_URL must be a PostgreSQL URL (postgres:// or postgresql://)"
+                )
+
+        # Validate cache directory if it exists: it must be a directory and writable.
+        try:
+            if self.cache_dir.exists():
+                if not self.cache_dir.is_dir():
+                    raise SettingsError(
+                        f"CACHE_DIR exists but is not a directory: {self.cache_dir}"
+                    )
+                if not os.access(self.cache_dir, os.W_OK):
+                    raise SettingsError(f"CACHE_DIR is not writable: {self.cache_dir}")
+        except OSError:
+            # If checking the path fails for OS reasons, raise a settings error.
+            raise SettingsError(f"Unable to access CACHE_DIR: {self.cache_dir}")
 
     def as_env(self) -> dict[str, str]:
         env = {
@@ -142,6 +217,16 @@ class Settings:
             "CACHE_TTL_SECONDS": str(self.cache_ttl_seconds),
             "PER_SOURCE_TIMEOUT_SECONDS": str(self.per_source_timeout_seconds),
             "MAX_SOURCES_PER_QUERY": str(self.max_sources_per_query),
+            "MAX_PARALLEL_EXTERNAL_CALLS": str(self.max_parallel_external_calls),
+            "EXTERNAL_MAX_RETRIES": str(self.external_max_retries),
+            "RETRY_BASE_DELAY_SECONDS": str(self.retry_base_delay_seconds),
+            "RETRY_MAX_DELAY_SECONDS": str(self.retry_max_delay_seconds),
+            "RATE_LIMIT_BACKOFF_SECONDS": str(self.rate_limit_backoff_seconds),
+            "RATE_LIMIT_BURST": str(self.rate_limit_burst),
+            "WIKIPEDIA_RPS": str(self.wikipedia_rps),
+            "ARXIV_RPS": str(self.arxiv_rps),
+            "WEB_RPS": str(self.web_rps),
+            "LLM_RPS": str(self.llm_rps),
         }
         optional_values = {
             "DATABASE_URL": self.database_url,

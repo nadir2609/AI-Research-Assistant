@@ -69,8 +69,4 @@ pytest-asyncio
 mypy
 
 # CLI
-click==8.2.1
-
-# For testing only:
-pytest==8.3.5
-asyncpg==0.30.0
+click

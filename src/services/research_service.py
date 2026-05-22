@@ -1,46 +1,28 @@
 from __future__ import annotations
 
-import json
-import asyncio
 import logging
 import time
-from pathlib import Path
-from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Literal
+from pathlib import Path
 
-from ai import AnswerWithCitations, Source, fetch_arxiv, fetch_web, fetch_wikipedia, synthesize
+from ai import AnswerWithCitations, Source, synthesize
 from ai.providers.base import ProviderError
+from src.concurrency.orchestrator import ResearchOrchestrator, SourceFetchResult
 from src.config import Settings
+from src.services.external_policy import ExternalCallPolicy
 from src.storage.repository import PostgresRepository
+from src.storage.source_cache import SourceCache
+from src.validation import (
+    MAX_QUESTION_CHARS,
+    ValidationError,
+    append_degraded_note,
+    sanitize_answer,
+    sanitize_fetched_sources,
+    validate_question,
+    validate_source_names,
+)
 
 logger = logging.getLogger(__name__)
-# text_log_path = Path(__file__).resolve().parents[2] / "research_service.log"
-raw_answer = logging.getLogger("raw_answer_questions")
-raw_answer.setLevel(logging.INFO)
-raw_answer.propagate = False
-file_handler = logging.FileHandler(Path(__file__).resolve().parents[2] / "raw_answer_questions.log", encoding="utf-8")
-file_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s - %(message)s"))
-raw_answer.addHandler(file_handler)
-SourceName = Literal["wiki", "wikipedia", "arxiv", "web"]
-
-_SOURCE_ALIASES: dict[str, str] = {
-    "wiki": "wikipedia",
-    "wikipedia": "wikipedia",
-    "arxiv": "arxiv",
-    "web": "web",
-}
-
-
-@dataclass(frozen=True, slots=True)
-class SourceFetchResult:
-    """Result of one source fetch attempt."""
-
-    source_type: str
-    sources: list[Source]
-    from_cache: bool = False
-    error: str | None = None
-    elapsed_seconds: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,33 +56,44 @@ class ResearchService:
 
     Responsibilities:
     - validate user question
-    - query selected sources concurrently
     - use repository cache when available
-    - retry transient source failures
-    - degrade gracefully if one source fails
+    - delegate parallel source fetch to ResearchOrchestrator
     - call the provided AI synthesizer
     - save final answer to history when repository is configured
     """
 
     def __init__(
-            self,
-            settings: Settings,
-            *,
-            repository: PostgresRepository | None = None,
-            max_question_chars: int = 1_000,
-            max_retries: int = 3,
+        self,
+        settings: Settings,
+        *,
+        source_cache: SourceCache | None = None,
+        repository: PostgresRepository | None = None,
+        max_question_chars: int = MAX_QUESTION_CHARS,
+        max_retries: int = 3,
+        external_policy: ExternalCallPolicy | None = None,
+        orchestrator: ResearchOrchestrator | None = None,
     ) -> None:
         self.settings = settings
+        self.source_cache = source_cache
         self.repository = repository
         self.max_question_chars = max_question_chars
         self.max_retries = max_retries
+        self.external_policy = external_policy or ExternalCallPolicy.from_settings(
+            settings,
+            max_retries=max_retries,
+        )
+        self._orchestrator = orchestrator or ResearchOrchestrator(
+            settings=settings,
+            policy=self.external_policy,
+        )
+        self._raw_answer_logger = _setup_raw_answer_logger()
 
     async def ask(
-            self,
-            question: str,
-            *,
-            source_names: list[str] | None = None,
-            use_cache: bool = True,
+        self,
+        question: str,
+        *,
+        source_names: list[str] | None = None,
+        use_cache: bool = True,
     ) -> ResearchResult:
         """
         Answer a research question using selected sources.
@@ -118,8 +111,11 @@ class ResearchService:
             ValueError: If question or source list is invalid, or no sources are retrieved.
             ProviderError: If synthesis fails.
         """
-        clean_question = self._validate_question(question)
-        selected_sources = self._normalize_sources(source_names)
+        clean_question = validate_question(
+            question,
+            max_chars=self.max_question_chars,
+        )
+        selected_sources = validate_source_names(source_names)
 
         logger.info(
             "Starting research request sources=%s cache=%s",
@@ -127,21 +123,22 @@ class ResearchService:
             use_cache,
         )
 
-        fetch_results = await self.fetch_sources(
+        fetch_results = await self._fetch_sources_with_cache(
             clean_question,
             source_names=selected_sources,
             use_cache=use_cache,
         )
 
+        fetch_results = self._limit_sources_per_origin(fetch_results)
+
         all_sources: list[Source] = []
         for result in fetch_results:
             all_sources.extend(result.sources)
 
+        all_sources = sanitize_fetched_sources(all_sources)
+
         if not all_sources:
-            errors = "; ".join(
-                result.error or "no results"
-                for result in fetch_results
-            )
+            errors = "; ".join(result.error or "no results" for result in fetch_results)
             raise ValueError(f"No sources were retrieved. Details: {errors}")
 
         degraded = any(result.error for result in fetch_results)
@@ -151,36 +148,37 @@ class ResearchService:
             len(all_sources),
             degraded,
         )
-        raw_answer.info(f"question: {clean_question}, sources: {all_sources}")
-        # try:
-        #     log_path = Path(__file__).resolve().parents[2] / "research_service.log"
-        #     with log_path.open("a", encoding="utf-8") as log_file:
-        #         log_file.write(
-        #             f"{time.strftime('%Y-%m-%d %H:%M:%S')} "
-        #             f"Raw sources(before synthesize): {all_sources!r}\n"
-        #         )
-        # except OSError as exc:
-        #     logger.warning("Failed to write raw sources log file: %s", exc)
+        self._raw_answer_logger.info(
+            "question: %s, sources: %s",
+            clean_question,
+            all_sources,
+        )
         try:
-            answer = await asyncio.to_thread(synthesize, clean_question, all_sources)
+            answer = await self.external_policy.call_sync(
+                "llm",
+                lambda: synthesize(clean_question, all_sources),
+            )
         except ProviderError:
             logger.exception("Synthesis provider failed")
-
             raise
         except ValueError:
             logger.exception("Synthesis input validation failed")
             raise
 
+        try:
+            answer = sanitize_answer(answer)
+        except ValidationError:
+            logger.exception("Synthesized answer failed output sanitization")
+            raise
+
         if degraded:
             missing = ", ".join(
-                result.source_type
-                for result in fetch_results
-                if result.error
+                result.source_type for result in fetch_results if result.error
             )
-            answer.answer = (
-                f"{answer.answer}\n\n"
-                f"Note: the result is partially degraded because these sources failed: "
-                f"{missing}."
+            answer = AnswerWithCitations(
+                question=answer.question,
+                answer=append_degraded_note(answer, missing),
+                citations=answer.citations,
             )
 
         if self.repository is not None:
@@ -196,133 +194,90 @@ class ResearchService:
             degraded=degraded,
         )
 
-    async def fetch_sources(
-            self,
-            question: str,
-            *,
-            source_names: list[str],
-            use_cache: bool = True,
+    async def _fetch_sources_with_cache(
+        self,
+        question: str,
+        *,
+        source_names: list[str],
+        use_cache: bool,
     ) -> list[SourceFetchResult]:
-        """Fetch all selected sources concurrently with graceful degradation."""
-        tasks = [
-            self._fetch_one_source(
-                source_type=source_type,
-                question=question,
-                use_cache=use_cache,
-            )
-            for source_type in source_names
-        ]
+        """Resolve cache hits, then fetch remaining sources in parallel."""
+        by_name: dict[str, SourceFetchResult] = {}
+        misses: list[str] = []
 
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        for source_type in source_names:
+            start = time.perf_counter()
+            if use_cache and self.source_cache is not None:
+                cached = await self._get_cached_sources(source_type, question)
+                if cached is not None:
+                    by_name[source_type] = SourceFetchResult(
+                        source_type=source_type,
+                        sources=cached,
+                        from_cache=True,
+                        elapsed_seconds=time.perf_counter() - start,
+                    )
+                    continue
+            misses.append(source_type)
 
-        normalized: list[SourceFetchResult] = []
-        for source_type, result in zip(source_names, results, strict=True):
-            if isinstance(result, SourceFetchResult):
-                normalized.append(result)
+        if misses:
+            live_results = await self._orchestrator.fetch_sources(question, misses)
+            for result in live_results:
+                if (
+                    result.error is None
+                    and result.sources
+                    and self.source_cache is not None
+                ):
+                    try:
+                        await self.source_cache.set(
+                            result.source_type,
+                            question,
+                            result.sources,
+                        )
+                    except Exception as exc:
+                        logger.warning(
+                            "Failed to save source cache source=%s error=%s",
+                            result.source_type,
+                            exc,
+                        )
+                by_name[result.source_type] = result
+
+        return [by_name[name] for name in source_names if name in by_name]
+
+    def _limit_sources_per_origin(
+        self,
+        fetch_results: list[SourceFetchResult],
+    ) -> list[SourceFetchResult]:
+        limit = self.settings.max_sources_per_query
+        if limit < 1:
+            return fetch_results
+
+        trimmed: list[SourceFetchResult] = []
+        for result in fetch_results:
+            sources = result.sources[:limit]
+            if len(sources) == len(result.sources):
+                trimmed.append(result)
                 continue
-
-            logger.exception(
-                "Unexpected source task failure source=%s error=%s",
-                source_type,
-                result,
-            )
-            normalized.append(
+            trimmed.append(
                 SourceFetchResult(
-                    source_type=source_type,
-                    sources=[],
-                    error=str(result),
+                    source_type=result.source_type,
+                    sources=sources,
+                    from_cache=result.from_cache,
+                    elapsed_seconds=result.elapsed_seconds,
+                    error=result.error,
                 )
             )
-
-        return normalized
-
-    async def _fetch_one_source(
-            self,
-            *,
-            source_type: str,
-            question: str,
-            use_cache: bool,
-    ) -> SourceFetchResult:
-        start = time.perf_counter()
-
-        if use_cache and self.repository is not None:
-            cached = await self._get_cached_sources(source_type, question)
-            if cached is not None:
-                return SourceFetchResult(
-                    source_type=source_type,
-                    sources=cached,
-                    from_cache=True,
-                    elapsed_seconds=time.perf_counter() - start,
-                )
-
-        fetcher = self._get_fetcher(source_type)
-
-        try:
-            sources = await self._retry_async(
-                lambda: self._fetch_with_timeout(fetcher, question),
-                label=source_type,
-            )
-        except Exception as exc:
-            logger.warning(
-                "Source fetch failed source=%s question=%r error=%s",
-                source_type,
-                question,
-                exc,
-            )
-            return SourceFetchResult(
-                source_type=source_type,
-                sources=[],
-                error=str(exc),
-                elapsed_seconds=time.perf_counter() - start,
-            )
-
-        if self.repository is not None:
-            try:
-                await self.repository.save_source_cache(source_type, question, sources)
-            except Exception as exc:
-                logger.warning(
-                    "Failed to save source cache source=%s error=%s",
-                    source_type,
-                    exc,
-                )
-
-        elapsed = time.perf_counter() - start
-        logger.info(
-            "Fetched source=%s count=%d elapsed=%.3fs",
-            source_type,
-            len(sources),
-            elapsed,
-        )
-
-        return SourceFetchResult(
-            source_type=source_type,
-            sources=sources,
-            elapsed_seconds=elapsed,
-        )
-
-    async def _fetch_with_timeout(
-            self,
-            fetcher: Callable[..., Awaitable[list[Source]]],
-            question: str,
-    ) -> list[Source]:
-        timeout = self.settings.per_source_timeout_seconds
-
-        async with asyncio.timeout(timeout):
-            return await fetcher(
-                question,
-                max_results=self.settings.max_sources_per_query,
-            )
+        return trimmed
 
     async def _get_cached_sources(
-            self,
-            source_type: str,
-            question: str,
+        self,
+        source_type: str,
+        question: str,
     ) -> list[Source] | None:
-        if self.repository is None:
+        if self.source_cache is None:
             return None
 
         try:
-            cached = await self.repository.get_cached_sources(source_type, question)
+            cached = await self.source_cache.get(source_type, question)
         except Exception as exc:
             logger.warning(
                 "Cache lookup failed source=%s error=%s",
@@ -336,83 +291,19 @@ class ResearchService:
 
         return cached
 
-    async def _retry_async(
-            self,
-            operation: Callable[[], Awaitable[list[Source]]],
-            *,
-            label: str,
-    ) -> list[Source]:
-        delay = 0.5
-        last_error: Exception | None = None
 
-        for attempt in range(1, self.max_retries + 1):
-            try:
-                return await operation()
-            except (TimeoutError, ProviderError, OSError) as exc:
-                last_error = exc
-                logger.warning(
-                    "Retryable failure label=%s attempt=%d/%d error=%s",
-                    label,
-                    attempt,
-                    self.max_retries,
-                    exc,
-                )
-
-                if attempt == self.max_retries:
-                    break
-
-                await asyncio.sleep(delay)
-                delay *= 2
-
-        if last_error is not None:
-            raise last_error
-
-        raise RuntimeError(f"Retry failed without an exception for {label}")
-
-    def _get_fetcher(
-            self,
-            source_type: str,
-    ) -> Callable[..., Awaitable[list[Source]]]:
-        if source_type == "wikipedia":
-            return fetch_wikipedia
-        if source_type == "arxiv":
-            return fetch_arxiv
-        if source_type == "web":
-            return fetch_web
-
-        raise ValueError(f"Unsupported source type: {source_type!r}")
-
-    def _validate_question(self, question: str) -> str:
-        clean = question.strip()
-
-        if not clean:
-            raise ValueError("Question must be non-empty.")
-
-        if len(clean) > self.max_question_chars:
-            raise ValueError(
-                f"Question is too long. Maximum length is "
-                f"{self.max_question_chars} characters."
-            )
-
-        return clean
-
-    def _normalize_sources(self, source_names: list[str] | None) -> list[str]:
-        if source_names is None:
-            return ["wikipedia", "arxiv", "web"]
-
-        normalized: list[str] = []
-        for source in source_names:
-            clean = source.strip().lower()
-            canonical = _SOURCE_ALIASES.get(clean)
-            if canonical is None:
-                allowed = ", ".join(sorted(_SOURCE_ALIASES))
-                raise ValueError(
-                    f"Unsupported source {source!r}. Allowed values: {allowed}."
-                )
-            if canonical not in normalized:
-                normalized.append(canonical)
-
-        if not normalized:
-            raise ValueError("At least one source must be selected.")
-
-        return normalized
+def _setup_raw_answer_logger() -> logging.Logger:
+    raw_logger = logging.getLogger("raw_answer_questions_from_sources")
+    if raw_logger.handlers:
+        return raw_logger
+    raw_logger.setLevel(logging.INFO)
+    raw_logger.propagate = False
+    log_path = (
+        Path(__file__).resolve().parents[2] / "raw_answer_questions_from_sources.log"
+    )
+    handler = logging.FileHandler(log_path, encoding="utf-8")
+    handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)s %(name)s - %(message)s")
+    )
+    raw_logger.addHandler(handler)
+    return raw_logger

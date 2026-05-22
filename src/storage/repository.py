@@ -89,9 +89,10 @@ class PostgresRepository:
 
         logger.info("Cache hit for %s:%s", source_type, query)
 
-        # `content` is stored as JSONB in the database, so we convert it back
-        # into Python dictionaries and then rebuild `Source` objects.
-        return [Source(**item) for item in row["content"]]
+        raw = row["content"]
+        if isinstance(raw, str):
+            raw = json.loads(raw)
+        return [Source(**item) for item in raw]
 
     async def save_source_cache(
         self, source_type: str, query: str, sources: List[Source]
@@ -103,7 +104,6 @@ class PostgresRepository:
         it is updated instead of inserted again.
         """
         query = query.lower().strip()
-        content = json.dumps([source.model_dump() for source in sources])
         validate_source_type(source_type)
         query = canonicalize_query(query)
         if not query:
@@ -111,12 +111,9 @@ class PostgresRepository:
         if len(query) > 2000:
             raise ValueError("query too long")
 
-        # Ensure sources are serializable and not excessively large
         content_list = [source.model_dump() for source in sources]
-        # pass the list directly so callers (and tests) receive Python structures
-        content = content_list
-        # approximate size check on serialized JSON to avoid overly large payloads
-        if len(json.dumps(content_list)) > 1_000_000:
+        content = json.dumps(content_list)
+        if len(content) > 1_000_000:
             raise ValueError("source cache content too large to store")
 
         async with self.pool.acquire() as conn:

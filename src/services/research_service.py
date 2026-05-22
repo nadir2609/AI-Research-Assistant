@@ -129,6 +129,8 @@ class ResearchService:
             use_cache=use_cache,
         )
 
+        fetch_results = self._limit_sources_per_origin(fetch_results)
+
         all_sources: list[Source] = []
         for result in fetch_results:
             all_sources.extend(result.sources)
@@ -136,10 +138,7 @@ class ResearchService:
         all_sources = sanitize_fetched_sources(all_sources)
 
         if not all_sources:
-            errors = "; ".join(
-                result.error or "no results"
-                for result in fetch_results
-            )
+            errors = "; ".join(result.error or "no results" for result in fetch_results)
             raise ValueError(f"No sources were retrieved. Details: {errors}")
 
         degraded = any(result.error for result in fetch_results)
@@ -174,9 +173,7 @@ class ResearchService:
 
         if degraded:
             missing = ", ".join(
-                result.source_type
-                for result in fetch_results
-                if result.error
+                result.source_type for result in fetch_results if result.error
             )
             answer = AnswerWithCitations(
                 question=answer.question,
@@ -246,6 +243,31 @@ class ResearchService:
 
         return [by_name[name] for name in source_names if name in by_name]
 
+    def _limit_sources_per_origin(
+        self,
+        fetch_results: list[SourceFetchResult],
+    ) -> list[SourceFetchResult]:
+        limit = self.settings.max_sources_per_query
+        if limit < 1:
+            return fetch_results
+
+        trimmed: list[SourceFetchResult] = []
+        for result in fetch_results:
+            sources = result.sources[:limit]
+            if len(sources) == len(result.sources):
+                trimmed.append(result)
+                continue
+            trimmed.append(
+                SourceFetchResult(
+                    source_type=result.source_type,
+                    sources=sources,
+                    from_cache=result.from_cache,
+                    elapsed_seconds=result.elapsed_seconds,
+                    error=result.error,
+                )
+            )
+        return trimmed
+
     async def _get_cached_sources(
         self,
         source_type: str,
@@ -276,7 +298,9 @@ def _setup_raw_answer_logger() -> logging.Logger:
         return raw_logger
     raw_logger.setLevel(logging.INFO)
     raw_logger.propagate = False
-    log_path = Path(__file__).resolve().parents[2] / "raw_answer_questions_from_sources.log"
+    log_path = (
+        Path(__file__).resolve().parents[2] / "raw_answer_questions_from_sources.log"
+    )
     handler = logging.FileHandler(log_path, encoding="utf-8")
     handler.setFormatter(
         logging.Formatter("%(asctime)s %(levelname)s %(name)s - %(message)s")

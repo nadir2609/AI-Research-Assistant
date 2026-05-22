@@ -130,7 +130,9 @@ class ExternalCallPolicy:
 
         if not isinstance(settings, Settings):
             raise TypeError("settings must be a Settings instance.")
-        retries = max_retries if max_retries is not None else settings.external_max_retries
+        retries = (
+            max_retries if max_retries is not None else settings.external_max_retries
+        )
         return cls(
             max_parallel=settings.max_parallel_external_calls,
             rate_limits={
@@ -246,3 +248,19 @@ def _looks_rate_limited(exc: Exception) -> bool:
         return True
     msg = str(exc).lower()
     return "429" in msg or "rate limit" in msg or "too many requests" in msg
+
+
+_QUOTA_HINTS = (
+    "quota",
+    "insufficient_quota",
+    "rate limit",
+    "billing",
+    "exceeded",
+    "capacity",
+)
+
+
+def is_quota_exhausted(exc: Exception) -> bool:
+    """Best-effort check for provider quota exhaustion messages."""
+    message = str(exc).lower()
+    return any(hint in message for hint in _QUOTA_HINTS)

@@ -1,0 +1,93 @@
+# One-command stack: PostgreSQL + API (schema auto-created on first start).
+#
+#   docker compose up --build
+#
+# Optional: copy .env.docker.example to .env and add API keys for live /ask requests.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: research-postgres
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: research_assistant
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/01-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d research_assistant"]
+      interval: 3s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+    restart: unless-stopped
+
+  app:
+    build: .
+    container_name: research-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://user:password@postgres:5432/research_assistant
+      REQUIRE_PROVIDER_KEYS: "false"
+      CACHE_DIR: /app/.cache
+      LOG_LEVEL: INFO
+      LLM_PROVIDER: anthropic
+      LLM_MODEL: claude-sonnet-4-6
+      WEB_SEARCH_PROVIDER: tavily
+      PER_SOURCE_TIMEOUT_SECONDS: "10"
+      CACHE_TTL_SECONDS: "86400"
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - app_cache:/app/.cache
+    entrypoint: ["sh", "/app/docker/entrypoint.sh"]
+    command:
+      [
+        "uvicorn",
+        "src.api:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+      ]
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # Offline demo (no API keys). Run: docker compose --profile demo up demo
+  demo:
+    profiles: ["demo"]
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://user:password@postgres:5432/research_assistant
+      REQUIRE_PROVIDER_KEYS: "false"
+      CACHE_DIR: /app/.cache
+      LOG_LEVEL: INFO
+    entrypoint: ["sh", "/app/docker/entrypoint.sh"]
+    command: ["python", "demo_ai.py", "--offline", "--limit", "3"]
+    restart: "no"
+
+volumes:
+  postgres_data:
+  app_cache:

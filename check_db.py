@@ -1,5 +1,6 @@
 ﻿import asyncio
 import asyncpg
+import json
 import sys
 import os
 
@@ -17,16 +18,17 @@ async def main(dsn: str):
             for r in cols:
                 print(f"  {r['column_name']}: {r['data_type']}")
 
-        print("\nTesting insert with Python list for citations (transaction will be rolled back)...")
+        print("\nTesting insert with JSON citations (transaction will be rolled back)...")
         tr = conn.transaction()
         await tr.start()
         try:
             try:
+                citations = [{"index": 1, "title": "T", "url": "https://t", "origin": "web"}]
                 await conn.execute(
                     "INSERT INTO research_history (question, answer, citations) VALUES ($1, $2, $3)",
                     "py-test-q",
                     "py-test-answer",
-                    [{"index": 1, "title": "T", "url": "https://t", "origin": "web"}],
+                    json.dumps(citations),
                 )
                 print("Insert executed successfully inside transaction.")
                 row = await conn.fetchrow(

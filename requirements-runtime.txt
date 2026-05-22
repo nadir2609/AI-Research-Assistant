@@ -1,0 +1,21 @@
+# Runtime dependencies for Docker / production (pinned).
+# Dev/test tools: pytest, mypy, etc. are not included here.
+
+httpx==0.28.1
+numpy==2.2.5
+pydantic==2.11.4
+python-dotenv==1.1.0
+
+click==8.1.8
+fastapi==0.115.12
+uvicorn[standard]==0.34.2
+
+asyncpg==0.30.0
+
+# LLM providers (pick via LLM_PROVIDER at runtime)
+anthropic==0.52.0
+openai==1.82.0
+google-genai==1.16.1
+
+# Optional web search backend (Tavily/Serper use httpx only)
+duckduckgo-search==8.0.1

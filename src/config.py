@@ -6,7 +6,7 @@ import os
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Final, Literal
+from typing import Final, Literal, cast
 
 from dotenv import dotenv_values
 from urllib.parse import urlparse
@@ -67,6 +67,7 @@ class Settings:
     llm_api_key: str | None = None
     tavily_api_key: str | None = None
     serper_api_key: str | None = None
+    require_provider_keys: bool = True
 
     @classmethod
     def from_env(cls, env_file: str | Path | None = None) -> Settings:
@@ -80,11 +81,14 @@ class Settings:
             "LLM_MODEL",
             default=_DEFAULT_LLM_BY_PROVIDER[llm_provider],
         )
-        web_provider = _parse_choice(
-            merged,
-            "WEB_SEARCH_PROVIDER",
-            ("tavily", "serper", "duckduckgo"),
-            default="tavily",
+        web_provider: WebSearchProvider = cast(
+            WebSearchProvider,
+            _parse_choice(
+                merged,
+                "WEB_SEARCH_PROVIDER",
+                ("tavily", "serper", "duckduckgo"),
+                default="tavily",
+            ),
         )
         log_level = _get_str(merged, "LOG_LEVEL", default="INFO").upper()
         if log_level not in _VALID_LOG_LEVELS:
@@ -130,11 +134,12 @@ class Settings:
         arxiv_rps = _get_float(merged, "ARXIV_RPS", default=1.0, minimum=0.1)
         web_rps = _get_float(merged, "WEB_RPS", default=1.0, minimum=0.1)
         llm_rps = _get_float(merged, "LLM_RPS", default=1.0, minimum=0.1)
+        require_provider_keys = _get_bool(merged, "REQUIRE_PROVIDER_KEYS", default=True)
 
         settings = cls(
             llm_provider=llm_provider,
             llm_model=llm_model,
-            web_search_provider=web_provider,
+            web_search_provider=cast(WebSearchProvider, web_provider),
             log_level=log_level,
             cache_dir=cache_dir,
             cache_ttl_seconds=cache_ttl,
@@ -157,11 +162,15 @@ class Settings:
             llm_api_key=_get_optional(merged, "LLM_API_KEY"),
             tavily_api_key=_get_optional(merged, "TAVILY_API_KEY"),
             serper_api_key=_get_optional(merged, "SERPER_API_KEY"),
+            require_provider_keys=require_provider_keys,
         )
         settings._validate_provider_keys()
         return settings
 
     def _validate_provider_keys(self) -> None:
+        if not self.require_provider_keys:
+            return
+
         if self.llm_provider == "anthropic" and not (
             self.anthropic_api_key or self.llm_api_key
         ):
@@ -227,6 +236,7 @@ class Settings:
             "ARXIV_RPS": str(self.arxiv_rps),
             "WEB_RPS": str(self.web_rps),
             "LLM_RPS": str(self.llm_rps),
+            "REQUIRE_PROVIDER_KEYS": str(self.require_provider_keys).lower(),
         }
         optional_values = {
             "DATABASE_URL": self.database_url,
@@ -302,6 +312,25 @@ def _get_float(
     if value < minimum:
         raise SettingsError(f"{key} must be >= {minimum}, got {value}.")
     return value
+
+
+def _get_bool(
+    values: dict[str, str],
+    key: str,
+    *,
+    default: bool,
+) -> bool:
+    raw = _get_optional(values, key)
+    if raw is None:
+        return default
+
+    normalized = raw.strip().lower()
+    if normalized in {"1", "true", "yes", "y", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "n", "off"}:
+        return False
+
+    raise SettingsError(f"{key} must be a boolean value, got {raw!r}.")
 
 
 def _parse_choice(

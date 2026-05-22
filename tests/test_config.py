@@ -91,6 +91,21 @@ def test_tavily_requires_api_key(tmp_path: Path):
         Settings.from_env(env_file)
 
 
+def test_require_provider_keys_can_be_disabled(tmp_path: Path):
+    env_file = tmp_path / ".env"
+    _write_env(
+        env_file,
+        """
+        LLM_PROVIDER=anthropic
+        WEB_SEARCH_PROVIDER=tavily
+        REQUIRE_PROVIDER_KEYS=false
+        """,
+    )
+
+    settings = Settings.from_env(env_file)
+    assert settings.require_provider_keys is False
+
+
 def test_configure_environment_exports_values(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

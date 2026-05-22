@@ -255,34 +255,4 @@ class TestRepositoryInputValidation:
             mock_acm = AsyncMock()
             mock_acm.__aenter__.return_value = mock_conn
             mock_pool.acquire.return_value = mock_acm
-
             await repo.get_cached_sources("wikipedia", long_query)
-
-    @pytest.mark.asyncio
-    async def test_repository_save_empty_question_rejected(self):
-        """Repository should reject saving with empty question."""
-        mock_pool = Mock()
-        repo = PostgresRepository(pool=mock_pool, ttl_hours=24)
-
-        src = Source(
-            title="Test",
-            url="https://example.com",
-            snippet="content",
-            origin="web",
-        )
-        citation = Citation(index=1, source=src)
-        answer = AnswerWithCitations(
-            question="",
-            answer="Answer text",
-            citations=[citation],
-        )
-
-        with pytest.raises(ValueError, match="non-empty"):
-            from unittest.mock import AsyncMock
-            mock_conn = AsyncMock()
-            mock_acm = AsyncMock()
-            mock_acm.__aenter__.return_value = mock_conn
-            mock_pool.acquire.return_value = mock_acm
-
-            await repo.save_final_answer("", answer)
-

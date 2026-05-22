@@ -119,7 +119,8 @@ async def test_save_source_cache_calls_execute_with_serialized_content():
     assert call_args[1] == "web"
     assert call_args[2] == "my query"  # repository lowercases the query
     # the content parameter should be the list of dicts we expect
-    assert call_args[3] == content_expected
+    assert isinstance(call_args[3], str)
+    assert json.loads(call_args[3]) == content_expected
 
 
 @pytest.mark.asyncio

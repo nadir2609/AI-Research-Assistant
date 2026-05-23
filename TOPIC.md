@@ -104,6 +104,7 @@ your-project/
 │   ├── services/
 │   │   ├── ai_service.py      # retries, logging around ai.*
 │   │   └── cache.py           # TTL-aware (source, query) cache
+
 │   ├── core/
 │   │   └── researcher.py      # business logic
 │   ├── concurrency/

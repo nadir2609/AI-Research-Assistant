@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Research Assistant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Merriweather:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f6f7fb;
+      --surface: #ffffff;
+      --surface-soft: #f1f5f9;
+      --border: #dbe3ee;
+      --accent: #2563eb;
+      --accent-soft: #dbeafe;
+      --accent-hover: #1d4ed8;
+      --text: #1f2937;
+      --muted: #64748b;
+      --wiki: #16a34a;
+      --arxiv: #ea580c;
+      --web: #7c3aed;
+      --error: #dc2626;
+      --warn: #ca8a04;
+      --shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+    }
+
+    html, body {
+      height: 100%;
+      background:
+        radial-gradient(circle at top left, rgba(219, 234, 254, 0.85), transparent 34%),
+        linear-gradient(135deg, #f8fafc 0%, #eef2f7 100%);
+      color: var(--text);
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    .shell {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      grid-template-rows: 100vh;
+      height: 100vh;
+    }
+
+    .sidebar {
+      background: rgba(255, 255, 255, 0.86);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 30px 22px 22px;
+      overflow-y: auto;
+      backdrop-filter: blur(18px);
+    }
+
+    .logo {
+      font-family: 'Merriweather', serif;
+      font-size: 24px;
+      color: var(--text);
+      letter-spacing: -0.4px;
+      margin-bottom: 6px;
+    }
+
+    .logo span { color: var(--accent); }
+
+    .tagline {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1.3px;
+      margin-bottom: 30px;
+      font-weight: 700;
+    }
+
+    .section-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: var(--muted);
+      margin-bottom: 10px;
+      font-weight: 700;
+    }
+
+    .sources-group { margin-bottom: 24px; }
+
+    .source-toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 10px;
+      border-radius: 12px;
+      cursor: pointer;
+      margin-bottom: 5px;
+      transition: background 0.15s, transform 0.15s;
+      user-select: none;
+    }
+
+    .source-toggle:hover {
+      background: var(--surface-soft);
+      transform: translateX(2px);
+    }
+
+    .source-toggle input { display: none; }
+
+    .toggle-track {
+      width: 32px;
+      height: 18px;
+      background: #cbd5e1;
+      border-radius: 99px;
+      position: relative;
+      flex-shrink: 0;
+      transition: background 0.2s;
+    }
+
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 12px;
+      height: 12px;
+      background: #ffffff;
+      border-radius: 50%;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25);
+      transition: transform 0.2s, background 0.2s;
+    }
+
+    .source-toggle input:checked + .toggle-track,
+    .cache-row input:checked + .toggle-track {
+      background: var(--accent);
+    }
+
+    .source-toggle input:checked + .toggle-track::after,
+    .cache-row input:checked + .toggle-track::after {
+      transform: translateX(14px);
+      background: #ffffff;
+    }
+
+    .source-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .dot-wiki  { background: var(--wiki); }
+    .dot-arxiv { background: var(--arxiv); }
+    .dot-web   { background: var(--web); }
+
+    .source-name {
+      font-size: 13px;
+      color: var(--text);
+      flex: 1;
+      font-weight: 600;
+    }
+
+    .cache-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px;
+      border-radius: 12px;
+      cursor: pointer;
+      margin-bottom: 24px;
+      transition: background 0.15s;
+      user-select: none;
+    }
+
+    .cache-row:hover { background: var(--surface-soft); }
+    .cache-row input { display: none; }
+
+    .cache-label {
+      font-size: 13px;
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .cache-sub {
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .questions-group { flex: 1; }
+
+    .question-chip {
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 12px;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      margin-bottom: 8px;
+      width: 100%;
+      text-align: left;
+      transition: all 0.15s;
+      line-height: 1.45;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
+    }
+
+    .question-chip:hover {
+      border-color: #93c5fd;
+      color: var(--text);
+      background: var(--accent-soft);
+    }
+
+    .health-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+      margin-top: auto;
+    }
+
+    .health-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+      transition: background 0.3s;
+    }
+
+    .health-dot.ok  { background: var(--wiki); box-shadow: 0 0 8px rgba(22, 163, 74, 0.45); }
+    .health-dot.err { background: var(--error); }
+    .health-text { font-size: 11px; color: var(--muted); }
+
+    .main {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+.conversation {
+  flex: 1;
+  overflow-y: auto;
+  padding: 36px 60px 140px;
+}
+    .conversation::-webkit-scrollbar { width: 6px; }
+    .conversation::-webkit-scrollbar-track { background: transparent; }
+    .conversation::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 12px;
+      color: var(--muted);
+    }
+
+    .empty-icon {
+      font-size: 46px;
+      margin-bottom: 6px;
+      filter: grayscale(15%);
+    }
+
+    .empty-title {
+      font-family: 'Merriweather', serif;
+      font-size: 28px;
+      color: var(--text);
+    }
+
+    .empty-sub { font-size: 13px; color: var(--muted); }
+
+    .msg { margin-bottom: 30px; animation: fadeUp 0.25s ease; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .msg-user {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .msg-user .bubble {
+      background: var(--accent);
+      border: 1px solid var(--accent);
+      color: #ffffff;
+      padding: 12px 18px;
+      border-radius: 18px 18px 6px 18px;
+      max-width: 620px;
+      font-size: 14px;
+      box-shadow: 0 10px 24px rgba(37, 99, 235, 0.22);
+    }
+
+    .msg-assistant { display: block; }
+
+    .answer-card {
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    .answer-body {
+      padding: 26px 30px;
+      font-size: 14.5px;
+      line-height: 1.85;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .answer-body .citation-ref {
+      display: inline-block;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border-radius: 6px;
+      padding: 0 5px;
+      font-size: 11px;
+      font-weight: 700;
+      vertical-align: super;
+      cursor: pointer;
+    }
+
+    .fetch-bar {
+      display: flex;
+      gap: 8px;
+      padding: 12px 20px;
+      background: #f8fafc;
+      border-top: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+
+    .fetch-chip {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      background: #ffffff;
+    }
+
+    .fetch-chip.cached { border-color: #93c5fd; color: var(--accent); }
+    .fetch-chip.live   { color: var(--muted); }
+    .fetch-chip.failed { border-color: #fecaca; color: var(--error); }
+
+    .citations-section {
+      border-top: 1px solid var(--border);
+      padding: 18px 22px;
+      background: #ffffff;
+    }
+
+    .citations-title {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      margin-bottom: 10px;
+      font-weight: 800;
+    }
+
+    .citation-item {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      margin-bottom: 10px;
+    }
+
+    .citation-num {
+      font-size: 11px;
+      color: var(--accent);
+      flex-shrink: 0;
+      padding-top: 2px;
+      font-weight: 800;
+    }
+
+    .citation-info { flex: 1; min-width: 0; }
+
+    .citation-title {
+      font-size: 12.5px;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-weight: 600;
+    }
+
+    .citation-url {
+      font-size: 10px;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .citation-url a { color: inherit; text-decoration: none; }
+    .citation-url a:hover { color: var(--accent); }
+
+    .origin-badge {
+      font-size: 9px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 800;
+    }
+
+    .origin-wikipedia { background: rgba(22, 163, 74, 0.10); color: var(--wiki); }
+    .origin-arxiv     { background: rgba(234, 88, 12, 0.10);  color: var(--arxiv); }
+    .origin-web       { background: rgba(124, 58, 237, 0.10); color: var(--web); }
+
+    .degraded-banner {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      background: #fffbeb;
+      border-top: 1px solid #fde68a;
+      font-size: 12px;
+      color: var(--warn);
+    }
+
+    .error-card {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 14px;
+      padding: 16px 20px;
+      font-size: 13px;
+      color: var(--error);
+    }
+
+    .thinking {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .dots { display: flex; gap: 4px; }
+
+    .dots span {
+      width: 6px;
+      height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: pulse 1.2s infinite;
+    }
+
+    .dots span:nth-child(2) { animation-delay: 0.2s; }
+    .dots span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes pulse {
+      0%, 80%, 100% { opacity: 0.25; transform: scale(0.8); }
+      40%           { opacity: 1; transform: scale(1); }
+    }
+
+    .input-area {
+  position: fixed;
+  left: 280px;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  padding: 24px 60px;
+  background: rgba(255, 255, 255, 0.96);
+  border-top: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+}
+
+    .input-wrapper {
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 11px 14px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+    }
+
+    .input-wrapper:focus-within {
+      border-color: #93c5fd;
+      box-shadow: 0 10px 28px rgba(37, 99, 235, 0.12);
+    }
+
+    textarea {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      resize: none;
+      line-height: 1.5;
+      min-height: 24px;
+      max-height: 160px;
+      overflow-y: auto;
+    }
+
+    textarea::placeholder { color: #94a3b8; }
+
+    .send-btn {
+      width: 38px;
+      height: 38px;
+      background: var(--accent);
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.15s;
+      color: white;
+    }
+
+    .send-btn:hover:not(:disabled) {
+      background: var(--accent-hover);
+      transform: translateY(-1px);
+    }
+
+    .send-btn:disabled {
+      opacity: 0.38;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .send-btn svg { width: 16px; height: 16px; }
+
+    .input-hint {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 6px;
+      padding: 0 4px;
+    }
+
+    @media(max-width:950px){
+
+  .layout{
+    grid-template-columns:1fr;
+  }
+
+  .sidebar{
+    display:none;
+  }
+
+  .conversation{
+    padding:24px 18px 140px;
+  }
+
+  .input-area{
+    left:0;
+    padding:20px;
+  }
+
+}
+
+  </style>
+</head>
+<body>
+<div class="shell">
+ 
+  <!-- ─── Sidebar ─── -->
+  <aside class="sidebar">
+    <div class="logo">Research<span>.</span>AI</div>
+    <div class="tagline">Async Research Assistant</div>
+ 
+    <div class="section-label">Sources</div>
+    <div class="sources-group">
+      <label class="source-toggle">
+        <input type="checkbox" id="src-wiki" checked />
+        <span class="toggle-track"></span>
+        <span class="source-dot dot-wiki"></span>
+        <span class="source-name">Wikipedia</span>
+      </label>
+      <label class="source-toggle">
+        <input type="checkbox" id="src-arxiv" checked />
+        <span class="toggle-track"></span>
+        <span class="source-dot dot-arxiv"></span>
+        <span class="source-name">arXiv</span>
+      </label>
+      <label class="source-toggle">
+        <input type="checkbox" id="src-web" checked />
+        <span class="toggle-track"></span>
+        <span class="source-dot dot-web"></span>
+        <span class="source-name">Web Search</span>
+      </label>
+    </div>
+ 
+    <div class="section-label">Options</div>
+    <label class="cache-row">
+      <div>
+        <div class="cache-label">Bypass cache</div>
+        <div class="cache-sub">Always fetch fresh results</div>
+      </div>
+      <input type="checkbox" id="no-cache" />
+      <span class="toggle-track"></span>
+    </label>
+ 
+    <div class="section-label">Example questions</div>
+    <div class="questions-group" id="question-chips"></div>
+ 
+    <div class="health-row">
+      <div class="health-dot" id="health-dot"></div>
+      <div class="health-text" id="health-text">Checking API…</div>
+    </div>
+  </aside>
+ 
+  <!-- ─── Main ─── -->
+  <main class="main">
+    <div class="conversation" id="conversation">
+      <div class="empty-state" id="empty-state">
+        <div class="empty-icon">🔭</div>
+        <div class="empty-title">What do you want to know?</div>
+    </div>
+ 
+    <div class="input-area">
+      <div class="input-wrapper">
+        <textarea
+          id="question-input"
+          placeholder="Ask a research question…"
+          rows="1"
+        ></textarea>
+        <button class="send-btn" id="send-btn" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"/>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </main>
+ 
+</div>
+ 
+<script>
+  /* ─── Sample questions ─── */
+  const SAMPLE_QUESTIONS = [
+    "What is photosynthesis and what are its main stages?",
+    "How do transformer-based language models handle long context windows?",
+    "What were the main causes of the 2008 financial crisis?",
+  ];
+ 
+  /* ─── DOM refs ─── */
+  const conv        = document.getElementById('conversation');
+  const emptyState  = document.getElementById('empty-state');
+  const input       = document.getElementById('question-input');
+  const sendBtn     = document.getElementById('send-btn');
+  const healthDot   = document.getElementById('health-dot');
+  const healthText  = document.getElementById('health-text');
+  const chipsEl     = document.getElementById('question-chips');
+  const noCache     = document.getElementById('no-cache');
+ 
+  /* ─── Populate chips ─── */
+  SAMPLE_QUESTIONS.forEach(q => {
+    const btn = document.createElement('button');
+    btn.className = 'question-chip';
+    btn.textContent = q;
+    btn.onclick = () => { input.value = q; autoResize(); updateSendBtn(); input.focus(); };
+    chipsEl.appendChild(btn);
+  });
+ 
+  /* ─── Health check ─── */
+  async function checkHealth() {
+    try {
+      const r = await fetch('/health');
+      if (r.ok) {
+        healthDot.className = 'health-dot ok';
+        healthText.textContent = 'API connected';
+      } else {
+        throw new Error(r.status);
+      }
+    } catch {
+      healthDot.className = 'health-dot err';
+      healthText.textContent = 'API unreachable';
+    }
+  }
+  checkHealth();
+ 
+  /* ─── Input auto-resize ─── */
+  function autoResize() {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 160) + 'px';
+  }
+  function updateSendBtn() {
+    sendBtn.disabled = !input.value.trim();
+  }
+  input.addEventListener('input', () => { autoResize(); updateSendBtn(); });
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (!sendBtn.disabled) submitQuestion();
+    }
+  });
+  sendBtn.addEventListener('click', submitQuestion);
+ 
+  /* ─── Get selected sources ─── */
+  function getSelectedSources() {
+    const map = { 'src-wiki': 'wiki', 'src-arxiv': 'arxiv', 'src-web': 'web' };
+    const selected = [];
+    for (const [id, val] of Object.entries(map)) {
+      if (document.getElementById(id).checked) selected.push(val);
+    }
+    return selected.length === 3 ? null : selected; // null = all (backend default)
+  }
+ 
+  /* ─── Render helpers ─── */
+  function hideEmpty() {
+    if (emptyState) emptyState.style.display = 'none';
+  }
+ 
+  function appendUserBubble(text) {
+    hideEmpty();
+    const div = document.createElement('div');
+    div.className = 'msg msg-user';
+    div.innerHTML = `<div class="bubble">${escHtml(text)}</div>`;
+    conv.appendChild(div);
+    conv.scrollTop = conv.scrollHeight;
+    return div;
+  }
+ 
+  function appendThinking() {
+    const div = document.createElement('div');
+    div.className = 'msg msg-assistant thinking';
+    div.innerHTML = `<div class="dots"><span></span><span></span><span></span></div><span>Searching sources in parallel…</span>`;
+    conv.appendChild(div);
+    conv.scrollTop = conv.scrollHeight;
+    return div;
+  }
+ 
+ function appendError(msg) {
+  let friendly = msg;
+
+  if (msg.includes("RESOURCE_EXHAUSTED") || msg.includes("429")) {
+    friendly =
+      "API quota limit reached. Please try again later or change the LLM provider/model in your .env file.";
+  }
+
+  const div = document.createElement("div");
+  div.className = "msg msg-assistant";
+  div.innerHTML = `<div class="error-card">⚠ ${escHtml(friendly)}</div>`;
+  conv.appendChild(div);
+  conv.scrollTop = conv.scrollHeight;
+  return div;
+}
+ 
+  function renderAnswer(data) {
+    /* Fetch bar */
+    const fetchChips = (data.fetch_results || []).map(fr => {
+      let cls = fr.error ? 'failed' : (fr.from_cache ? 'cached' : 'live');
+      const dot = { wikipedia: '●', arxiv: '▲', web: '◆' }[fr.source_type] || '•';
+      const label = fr.error
+        ? `${fr.source_type}: failed`
+        : `${fr.source_type} · ${fr.count} src · ${fr.elapsed_seconds.toFixed(2)}s${fr.from_cache ? ' · cached' : ''}`;
+      return `<span class="fetch-chip ${cls}">${dot} ${escHtml(label)}</span>`;
+    }).join('');
+ 
+    /* Citations */
+    const citationsHtml = data.citations && data.citations.length
+      ? `<div class="citations-section">
+           <div class="citations-title">References</div>
+           ${data.citations.map(c => `
+             <div class="citation-item">
+               <div class="citation-num">[${c.index}]</div>
+               <div class="citation-info">
+                 <div class="citation-title">
+                   <span class="origin-badge origin-${escHtml(c.origin)}">${escHtml(c.origin)}</span>
+                   &nbsp;${escHtml(c.title)}
+                 </div>
+                 <div class="citation-url"><a href="${escHtml(c.url)}" target="_blank" rel="noopener">${escHtml(c.url)}</a></div>
+               </div>
+             </div>`).join('')}
+         </div>`
+      : '';
+ 
+    /* Answer text — highlight [N] citation markers */
+    const answerHtml = escHtml(data.answer).replace(
+      /\[(\d+)\]/g,
+      '<span class="citation-ref">[$1]</span>'
+    );
+ 
+    const degradedHtml = data.degraded
+      ? `<div class="degraded-banner">⚠ Answer produced with partial source failures.</div>`
+      : '';
+ 
+    const div = document.createElement('div');
+    div.className = 'msg msg-assistant';
+    div.innerHTML = `
+      <div class="answer-card">
+        <div class="answer-body">${answerHtml}</div>
+        ${fetchChips ? `<div class="fetch-bar">${fetchChips}</div>` : ''}
+        ${citationsHtml}
+        ${degradedHtml}
+      </div>`;
+    return div;
+  }
+ 
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+ 
+  /* ─── Submit ─── */
+  let busy = false;
+ 
+  async function submitQuestion() {
+    if (busy) return;
+    const question = input.value.trim();
+    if (!question) return;
+ 
+    busy = true;
+    sendBtn.disabled = true;
+    input.value = '';
+    input.style.height = 'auto';
+ 
+    appendUserBubble(question);
+    const thinking = appendThinking();
+ 
+    const sources = getSelectedSources();
+    const no_cache = noCache.checked;
+ 
+    const payload = { question, no_cache };
+    if (sources) payload.sources = sources;
+ 
+    try {
+      const resp = await fetch('/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+ 
+      thinking.remove();
+ 
+      if (!resp.ok) {
+        let detail = `HTTP ${resp.status}`;
+        try { const e = await resp.json(); detail = e.detail || detail; } catch {}
+        appendError(detail);
+      } else {
+        const data = await resp.json();
+        const card = renderAnswer(data);
+        conv.appendChild(card);
+        conv.scrollTop = conv.scrollHeight;
+      }
+    } catch (err) {
+      thinking.remove();
+      appendError('Could not reach the API. Is the server running?');
+    } finally {
+      busy = false;
+      updateSendBtn();
+    }
+  }
+</script>
+</body>
+</html>

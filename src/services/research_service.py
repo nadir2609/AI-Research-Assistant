@@ -86,8 +86,6 @@ class ResearchService:
             settings=settings,
             policy=self.external_policy,
         )
-        self._raw_answer_logger = _setup_raw_answer_logger()
-
     async def ask(
         self,
         question: str,
@@ -147,11 +145,6 @@ class ResearchService:
             "Fetched %d total sources degraded=%s",
             len(all_sources),
             degraded,
-        )
-        self._raw_answer_logger.info(
-            "question: %s, sources: %s",
-            clean_question,
-            all_sources,
         )
         try:
             answer = await self.external_policy.call_sync(
@@ -291,19 +284,3 @@ class ResearchService:
 
         return cached
 
-
-def _setup_raw_answer_logger() -> logging.Logger:
-    raw_logger = logging.getLogger("raw_answer_questions_from_sources")
-    if raw_logger.handlers:
-        return raw_logger
-    raw_logger.setLevel(logging.INFO)
-    raw_logger.propagate = False
-    log_path = (
-        Path(__file__).resolve().parents[2] / "raw_answer_questions_from_sources.log"
-    )
-    handler = logging.FileHandler(log_path, encoding="utf-8")
-    handler.setFormatter(
-        logging.Formatter("%(asctime)s %(levelname)s %(name)s - %(message)s")
-    )
-    raw_logger.addHandler(handler)
-    return raw_logger

@@ -12,14 +12,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Runtime deps only (see requirements-runtime.txt)
-COPY requirements-runtime.txt ./
+# Runtime + test deps (offline pytest in container; see requirements-test.txt)
+COPY requirements-runtime.txt requirements-test.txt ./
 RUN pip install --upgrade pip \
-    && pip install -r requirements-runtime.txt
+    && pip install -r requirements-runtime.txt -r requirements-test.txt
 
 # Application code (ai/ is provided unmodified; SE layer in src/)
 COPY ai/ ./ai/
 COPY src/ ./src/
+COPY tests/ ./tests/
 COPY docker/ ./docker/
 COPY data/ ./data/
 COPY demo_ai.py researcher.py check_db.py pytest.ini ./

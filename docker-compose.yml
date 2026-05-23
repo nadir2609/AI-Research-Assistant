@@ -27,6 +27,7 @@ services:
 
   app:
     build: .
+    platform: linux/amd64
     container_name: research-app
     depends_on:
       postgres:
@@ -34,6 +35,8 @@ services:
     ports:
       - "8000:8000"
     environment:
+      # Point at the postgres service and use the same credentials as the postgres
+      # service (POSTGRES_USER/POSTGRES_PASSWORD/POSTGRES_DB).
       DATABASE_URL: postgresql://user:password@postgres:5432/research_assistant
       REQUIRE_PROVIDER_KEYS: "false"
       CACHE_DIR: /app/.cache
@@ -76,10 +79,13 @@ services:
   demo:
     profiles: ["demo"]
     build: .
+    platform: linux/amd64
     depends_on:
       postgres:
         condition: service_healthy
     environment:
+      # Use the compose postgres service hostname so the demo container connects
+      # to the bundled database when running under docker-compose.
       DATABASE_URL: postgresql://user:password@postgres:5432/research_assistant
       REQUIRE_PROVIDER_KEYS: "false"
       CACHE_DIR: /app/.cache

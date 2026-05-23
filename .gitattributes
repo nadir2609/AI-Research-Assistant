@@ -1,0 +1,4 @@
+# Ensure shell scripts in the repo keep LF line endings (prevents /bin/sh errors)
+docker/*.sh text eol=lf
+*.sh text eol=lf
+

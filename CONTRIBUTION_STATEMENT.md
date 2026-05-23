@@ -6,21 +6,6 @@
 **Final tag:** `v1.0-final`
 **Submission date:** 2026-05-24
 
----
-
-## How to fill this in
-
-This is the single piece of evidence we use to assess **individual contribution** within the team. Rules:
-
-1. Every member writes their own three subsections (Owned, Co-owned, Reviewed).
-2. **Be specific.** "Worked on the backend" is not acceptable; "implemented `src/services/ai_service.py` and `src/concurrency/pipeline.py`, owned PRs #4, #7, #11" is.
-3. The committed-percentages must add to 100% and approximately match `git shortlog -sn` on the `main` branch.
-4. All three members must sign at the bottom. Unsigned submissions are returned ungraded.
-
-If one member contributed less than 10% without a documented reason (illness, emergency), the team loses 5 points automatically per the rubric.
-
----
-
 ## Member A — Narmina IbrahimovaName (`@nnrmina)
 
 **Owned (sole author of these files / PRs):**

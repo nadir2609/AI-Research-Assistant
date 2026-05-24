@@ -140,7 +140,7 @@ python -m researcher ask "What is photosynthesis and what are its main stages?"
 Select sources:
 
 ```bash
-python -m researcher ask "What is photosynthesis and what are its main stages?"
+python -m researcher ask "What is photosynthesis and what are its main stages?" --sources web,wiki
 ```
 
 Bypass cache:

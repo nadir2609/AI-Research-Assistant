@@ -70,3 +70,6 @@ mypy
 
 # CLI
 click
+
+
+google-genai

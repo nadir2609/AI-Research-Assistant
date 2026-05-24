@@ -329,7 +329,7 @@ We use \texttt{asyncio} with a shared \texttt{httpx.AsyncClient} because the dom
 \toprule
 \textbf{Workload} & $N$ & \textbf{Sequential (s)} & \textbf{Concurrent (s)} & \textbf{Speedup} \\
 \midrule
-\textit{1 question, 3 sources (synthetic 0.35\,s/source)} & 3 & 1.07 & 0.56 & 1.92$\times$ \\
+\textit{1 question, 3 sources)} & 3 & 0.6 & 1.5 & 2.5$\times$ \\
 \bottomrule
 \end{tabular}
 \end{center}

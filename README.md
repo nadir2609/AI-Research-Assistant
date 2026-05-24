@@ -3,10 +3,6 @@
 > **Advanced Async Research Question Answering System**
 > Fetches Wikipedia, arXiv, and web search results **in parallel**, synthesizes answers with LLM-powered citations, and caches results intelligently.
 
-![Status](https://img.shields.io/badge/status-production--ready-brightgreen)
-![Python](https://img.shields.io/badge/python-3.12%2B-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
-
 ---
 
 ## 📋 Table of Contents
@@ -30,49 +26,45 @@
 
 ## 🚀 Quick Start
 
-### Option A — Docker (recommended)
-
-Starts Postgres + API quickly.
-
-```powershell
-# Windows
-.\run.ps1
-```
-
-```bash
-# macOS / Linux
-chmod +x run.sh && ./run.sh
-```
-
-Open http://localhost:8000/health — expect `{"status":"ok"}`.
-
-To run live research, copy the Docker env template and add keys:
-
-```bash
-cp .env.docker.example .env
-# Edit .env with provider API keys
-docker compose up --build
-```
-
-### Option B — Local Python (development)
+### Option A — Local Python
 
 ```bash
 python -m venv .venv
+
 # macOS / Linux
 source .venv/bin/activate
+
 # Windows PowerShell
 .\.venv\Scripts\Activate.ps1
 
 pip install -r requirements-runtime.txt
+
 pip install -r requirements-test.txt  # optional for tests
+
 cp .env.example .env
 # edit .env with keys if needed
 
-# Offline demo (no API keys)
-python demo_ai.py --offline
-
-# CLI example
+# CLI
 python -m researcher ask "What is photosynthesis?" --sources wiki,arxiv
+
+# UI app
+uvicorn ui_app:ui_app --reload
+```
+
+### Option B — Run with Docker
+
+```powershell
+docker compose up --build
+```
+
+Optional helpers:
+
+```powershell
+# detached mode
+docker compose up --build -d
+
+# stop stack
+docker compose down
 ```
 
 ---
@@ -164,7 +156,10 @@ Output includes synthesized answer, numbered citations, and per-source fetch sum
 Run server (dev):
 
 ```bash
-uvicorn src.api:app --reload --host 127.0.0.1 --port 8000
+#ui
+uvicorn ui_app:ui_app --reload
+# only api
+uvicorn src.api:app --reload 
 ```
 
 Health:
@@ -270,10 +265,4 @@ Please open issues or PRs. Do not modify files under `ai/` (course contract). Fo
 
 ---
 
-## 📄 License
-
-MIT — see `LICENSE`.
-
----
-
-**Last updated:** May 23, 2026
+**Last updated:** May 24, 2026

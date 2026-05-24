@@ -1,23 +1,38 @@
-# Async Research Assistant (Topic 4)
+# 🔬 AI Research Assistant
 
-**AI Academy — Software Engineering Final Project · Spring 2026**
+> **Advanced Async Research Question Answering System**
+> Fetches Wikipedia, arXiv, and web search results **in parallel**, synthesizes answers with LLM-powered citations, and caches results intelligently.
 
-Answers research questions by fetching **Wikipedia**, **arXiv**, and **web search** in parallel, then synthesizing a cited summary with an LLM. The course provides the `ai/` package; this repo is the **software-engineering layer**: configuration, caching, concurrency, retries, validation, logging, CLI, HTTP API, PostgreSQL, tests, and Docker.
-
-| | |
-|---|---|
-| **Topic** | [TOPIC.md](TOPIC.md) |
-| **Brief** | [SOFTWARE_PROJECT.tex](SOFTWARE_PROJECT.tex) |
-| **Repository** | https://github.com/nadir2609/AI-Research-Assistant |
-| **Final tag** | `v1.0-final` (before submission) |
+![Status](https://img.shields.io/badge/status-production--ready-brightgreen)
+![Python](https://img.shields.io/badge/python-3.12%2B-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
 
-## Quick start
+## 📋 Table of Contents
+
+- [Quick Start](#quick-start)
+- [Features](#features)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Usage](#usage)
+  - [CLI](#cli)
+  - [HTTP API](#http-api)
+  - [Docker](#docker)
+- [Architecture](#architecture)
+- [Database](#database)
+- [Performance](#performance)
+- [Testing](#testing)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+
+---
+
+## 🚀 Quick Start
 
 ### Option A — Docker (recommended)
 
-Starts **PostgreSQL** (schema auto-created), verifies tables, runs the **API** on port **8000**. No local Postgres install required.
+Starts Postgres + API quickly.
 
 ```powershell
 # Windows
@@ -27,376 +42,238 @@ Starts **PostgreSQL** (schema auto-created), verifies tables, runs the **API** o
 ```bash
 # macOS / Linux
 chmod +x run.sh && ./run.sh
+```
 
-# or
+Open http://localhost:8000/health — expect `{"status":"ok"}`.
+
+To run live research, copy the Docker env template and add keys:
+
+```bash
+cp .env.docker.example .env
+# Edit .env with provider API keys
 docker compose up --build
 ```
 
-Then open http://localhost:8000/health — expect `{"status":"ok"}`.
-
-For live research via `/ask`, copy [.env.docker.example](.env.docker.example) to `.env` and add your API keys, then restart: `docker compose up --build`.
-
-### Option B — Local Python
+### Option B — Local Python (development)
 
 ```bash
-python -m venv .venv && .\.venv\Scripts\Activate.ps1   # Windows
+python -m venv .venv
+# macOS / Linux
+source .venv/bin/activate
+# Windows PowerShell
+.\.venv\Scripts\Activate.ps1
+
 pip install -r requirements-runtime.txt
-pip install pytest pytest-asyncio pytest-cov respx
-copy .env.example .env
-# edit .env with API keys
+pip install -r requirements-test.txt  # optional for tests
+cp .env.example .env
+# edit .env with keys if needed
+
+# Offline demo (no API keys)
 python demo_ai.py --offline
+
+# CLI example
 python -m researcher ask "What is photosynthesis?" --sources wiki,arxiv
 ```
 
 ---
 
-## Features
+## ✨ Features
 
-- **Parallel source fetch** — `asyncio.gather`, per-source timeouts, graceful degradation
-- **Shared `httpx` client** — `follow_redirects=True` for arXiv (no `ai/` edits needed)
-- **Retries & rate limits** — token buckets, exponential backoff (`ExternalCallPolicy`)
-- **Two-tier cache** — filesystem JSON (`CACHE_DIR`) + PostgreSQL (`research_cache`)
-- **Answer history** — final Q&A stored in `research_history` when DB is connected
-- **Validation** — CLI and FastAPI entry points
-- **Docker Compose** — Postgres + API in one command (`run.ps1` / `run.sh`)
-
----
-
-## Architecture
-
-```mermaid
-flowchart TB
-  subgraph entry [Entry points]
-    CLI[CLI]
-    API[FastAPI]
-  end
-  CLI --> R[Researcher]
-  API --> R
-  R --> S[ResearchService]
-  S --> V[validation]
-  S --> C[TieredSourceCache]
-  C --> FS[(Filesystem cache)]
-  C --> PG[(PostgreSQL cache)]
-  S --> O[ResearchOrchestrator]
-  O --> P[ExternalCallPolicy]
-  P --> AI["ai.fetch_* / synthesize"]
-  S --> H[research_history]
-```
-
-| Component | Path |
-|-----------|------|
-| Provided AI module | `ai/` — **do not edit** |
-| Settings | `src/config.py` |
-| Parallel fetch | `src/concurrency/orchestrator.py` |
-| Pipeline | `src/services/research_service.py` |
-| Retries / limits | `src/services/external_policy.py` |
-| Storage | `src/storage/` |
-| CLI / API | `src/cli.py`, `src/api.py` |
+- Parallel source fetch (Wikipedia, arXiv, web) with per-source timeouts
+- Shared httpx AsyncClient for connection reuse
+- Two-tier cache: filesystem JSON + PostgreSQL
+- Retries with exponential backoff, jitter, and rate-limit handling
+- Token-bucket rate limiting per provider
+- Input validation and output sanitization
+- CLI and FastAPI HTTP API
+- Docker Compose stack with health checks
+- Offline tests using mocked HTTP/DB
 
 ---
 
-## Prerequisites
+## 📦 Installation
 
-| Need | Local dev | Docker |
-|------|-----------|--------|
-| Python 3.12+ | Yes | Included in image |
-| API keys | For live `/ask` or CLI | Optional in `.env` |
-| PostgreSQL | Optional | Included via Compose |
-| Docker Desktop | — | Yes |
+Prerequisites: Python 3.12+, Docker (optional), optional PostgreSQL for persistence.
 
----
-
-## Configuration
-
-Copy a template and add secrets (never commit `.env`):
+Clone:
 
 ```bash
-copy .env.example .env          # local development
-copy .env.docker.example .env   # Docker Compose (recommended)
+git clone https://github.com/nadir2609/AI-Research-Assistant.git
+cd AI-Research-Assistant
 ```
 
-### Required for live research
-
-| Variable | Example | Notes |
-|----------|---------|-------|
-| `LLM_PROVIDER` | `anthropic` / `openai` / `gemini` | Must match your API key |
-| `LLM_MODEL` | `claude-sonnet-4-6` | Provider-specific model |
-| `ANTHROPIC_API_KEY` | `sk-...` | When `LLM_PROVIDER=anthropic` |
-| `WEB_SEARCH_PROVIDER` | `tavily` / `serper` / `duckduckgo` | |
-| `TAVILY_API_KEY` | `tvly-...` | When using Tavily |
-
-### Optional / SE tuning
-
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `DATABASE_URL` | — | PostgreSQL; unset = filesystem cache only |
-| `CACHE_DIR` | `./.cache` | Filesystem cache root |
-| `CACHE_TTL_SECONDS` | `86400` | Cache expiry |
-| `PER_SOURCE_TIMEOUT_SECONDS` | `10` | Per-source fetch timeout |
-| `REQUIRE_PROVIDER_KEYS` | `true` | Set `false` in Docker so API starts without keys |
-| `LOG_LEVEL` | `INFO` | Logging verbosity |
-
-Full list: [.env.example](.env.example) and [.env.docker.example](.env.docker.example).
-
-**Docker Compose** sets `DATABASE_URL=postgresql://user:password@postgres:5432/research_assistant` and `REQUIRE_PROVIDER_KEYS=false` automatically (Compose `environment` overrides `.env` for those keys).
+Follow Quick Start (Docker or Local Python) above.
 
 ---
 
-## Run locally
+## ⚙️ Configuration
 
-### Verify the provided `ai/` module (no keys, no network)
+Copy the template and set provider keys and tuning variables:
 
 ```bash
-python demo_ai.py --offline
-python demo_ai.py --offline --limit 3
-pytest tests/test_ai_smoke.py -v
+cp .env.example .env
+# or for Docker
+cp .env.docker.example .env
 ```
+
+Important env vars (examples):
+
+- `LLM_PROVIDER`: anthropic | openai | gemini
+- `LLM_MODEL`: provider-specific model
+- `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GOOGLE_API_KEY`
+- `WEB_SEARCH_PROVIDER`: tavily | serper | duckduckgo
+- `TAVILY_API_KEY` / `SERPER_API_KEY` (when required)
+- `DATABASE_URL`: postgresql://user:password@host:port/db
+- `CACHE_DIR`: ./.cache
+- `CACHE_TTL_SECONDS`: 86400
+- `PER_SOURCE_TIMEOUT_SECONDS`: 10
+- `MAX_SOURCES_PER_QUERY`: 3
+- `EXTERNAL_MAX_RETRIES`: 3
+- `LOG_LEVEL`: INFO
+
+See `.env.example` and `src/config.py` for the full list and defaults.
+
+---
+
+## 📖 Usage
 
 ### CLI
 
+Basic:
+
 ```bash
-python -m researcher ask "What is photosynthesis?" --sources wiki,arxiv,web
+python -m researcher ask "What is photosynthesis?"
+```
+
+Select sources:
+
+```bash
+python -m researcher ask "What is photosynthesis?" --sources wiki,arxiv
+```
+
+Bypass cache:
+
+```bash
 python -m researcher ask "What is photosynthesis?" --no-cache
 ```
 
-Source aliases: `wiki` / `wikipedia`, `arxiv`, `web` (default: all three).
+Output includes synthesized answer, numbered citations, and per-source fetch summary.
 
 ### HTTP API
+
+Run server (dev):
 
 ```bash
 uvicorn src.api:app --reload --host 127.0.0.1 --port 8000
 ```
 
+Health:
+
 ```bash
 curl http://127.0.0.1:8000/health
+# {"status":"ok"}
+```
 
+Ask (example):
+
+```bash
 curl -s -X POST http://127.0.0.1:8000/ask \
   -H "Content-Type: application/json" \
   -d '{"question":"What is photosynthesis?","sources":["wiki","arxiv"],"no_cache":false}'
 ```
 
-```powershell
-Invoke-RestMethod http://127.0.0.1:8000/health
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/ask `
-  -ContentType "application/json" `
-  -Body '{"question":"What is photosynthesis?","sources":["wiki","arxiv"],"no_cache":false}'
-```
+Response contains question, answer, citations, degraded flag, and fetch_results metadata.
 
-Sample questions: [data/research_questions.json](data/research_questions.json).
+### Docker
 
----
-
-## PostgreSQL
-
-### With Docker (automatic)
-
-Compose runs Postgres 16 and applies [docker/postgres/01-init.sql](docker/postgres/01-init.sql) on first start:
-
-| Table | Purpose |
-|-------|---------|
-| `research_cache` | Cached source fetch results (`source_type`, `query_text`, `content` JSONB) |
-| `research_history` | Final answers and citations |
-
-Credentials (Compose defaults): **user** / **password**, database **research_assistant**, host **localhost:5432**.
-
-Verify from the stack:
+Start stack:
 
 ```bash
-docker compose run --rm app python check_db.py
-```
-
-### Without Docker (manual)
-
-```bash
-psql -U postgres -f src/storage/Research_Assistant_db.sql
-```
-
-Set `DATABASE_URL` in `.env`, then:
-
-```bash
-python check_db.py
-```
-
-If the DB is down or `DATABASE_URL` is unset, the app continues with **filesystem cache only**.
-
----
-
-## Docker
-
-### What starts
-
-| Service | Container | Port | Role |
-|---------|-----------|------|------|
-| `postgres` | `research-postgres` | 5432 | DB + auto schema |
-| `app` | `research-app` | 8000 | FastAPI after DB ready |
-| `demo` | (profile) | — | Offline demo, one-shot |
-
-Startup flow:
-
-```
-postgres (healthy) → wait_for_db → verify_stack → uvicorn
-```
-
-Scripts: [docker/wait_for_db.py](docker/wait_for_db.py), [docker/verify_stack.py](docker/verify_stack.py), [docker/entrypoint.sh](docker/entrypoint.sh).
-
-### Commands
-
-```bash
-# Start stack (build + run)
 docker compose up --build
-
-# Detached
-docker compose up --build -d
-
-# Stop
-docker compose down
-
-# Wipe DB volume (fresh schema)
-docker compose down -v
-
-# Offline demo (no API keys)
-docker compose --profile demo run --rm demo
-
-# CLI one-off
-docker compose run --rm app python -m researcher ask "What is photosynthesis?" --sources wiki,arxiv
-
-# DB connectivity test
-docker compose run --rm app python check_db.py
-
-# Rebuild after code changes
-docker compose build app && docker compose up -d
 ```
 
-### Standalone image (no Postgres)
+Run offline demo profile (no keys):
 
 ```bash
-docker build -t research-assistant .
-docker run --rm research-assistant
+docker compose --profile demo run --rm demo
 ```
 
-Runs `demo_ai.py --offline` (default `CMD`). No database required.
+Run CLI inside container:
 
-Dependencies: [requirements-runtime.txt](requirements-runtime.txt) · Compose: [docker-compose.yml](docker-compose.yml) · Image: [Dockerfile](Dockerfile).
+```bash
+docker compose run --rm app python -m researcher ask "What is photosynthesis?"
+```
 
 ---
 
-## Testing
+## 🏗 Architecture (high level)
 
-All tests are **offline** (mocked HTTP / DB):
+- Entry: CLI (`researcher`) or FastAPI (`src/api.py`)
+- Validation and sanitization (`src/validation.py`)
+- ResearchService coordinates cache, orchestrator, and synthesis (`src/services/research_service.py`)
+- ResearchOrchestrator runs parallel fetches (`src/concurrency/orchestrator.py`)
+- ExternalCallPolicy provides retries, rate limits, and concurrency guards (`src/services/external_policy.py`)
+- Storage: filesystem cache + PostgreSQL repository (`src/storage/`)
+- AI module (`ai/`) provides `fetch_wikipedia`, `fetch_arxiv`, `fetch_web`, and `synthesize` (do not modify)
+
+Refer to `SOFTWARE_PROJECT.tex` for diagrams and rationale used in the course report.
+
+---
+
+## 🗄 Database
+
+Docker Compose creates and initializes Postgres with `docker/postgres/01-init.sql`.
+
+Tables of interest:
+
+- `research_cache(source_type, query_text, content JSONB, created_at)`
+- `research_history(id, question, answer JSONB, sources JSONB, created_at)`
+
+Use `DATABASE_URL` to point to a PostgreSQL instance when you want persistent cache & history.
+
+---
+
+## 📊 Performance
+
+- Parallel fetching reduces wall-clock to ~max(source latencies) + synthesis time (not sum).
+- Caching reduces repeat query latency dramatically.
+- Rate limits (token bucket) protect providers and avoid 429s.
+
+---
+
+## 🧪 Testing
+
+Run all tests:
 
 ```bash
 pytest -v
 pytest --cov=src --cov-report=term-missing
-pytest tests/test_ai_smoke.py -v
 ```
 
-Target: **≥ 60%** coverage on `src/`.
-
-Inside Docker (rebuild image first if tests were added to the image):
-
-```bash
-docker compose build app
-docker compose run --rm app pytest tests/test_ai_smoke.py -q
-```
+The tests are offline and mock external HTTP and DB, including the mandatory smoke test `tests/test_ai_smoke.py`.
 
 ---
 
-## Performance: sequential vs parallel
+## 🔧 Troubleshooting
 
-The CLI prints a **Source fetch summary** after each answer.
+- If API won't start due to missing keys, set `REQUIRE_PROVIDER_KEYS=false` in `.env` (only for local/demo use).
+- If Postgres port 5432 is in use, stop local Postgres or change ports in `docker-compose.yml`.
+- If container shows stale code, rebuild with `docker compose build --no-cache`.
 
-1. Clear cache: `--no-cache` or delete `./.cache`.
-2. **Parallel:** one run with `--sources wiki,arxiv,web` — wall time ≈ **max** of source times + synthesis.
-3. **Sequential:** three runs with one source each; **sum** the elapsed times.
-
-```bash
-python -m researcher ask "What is photosynthesis?" --sources wiki,arxiv,web --no-cache
-```
-
-| Mode | Wall-clock (s) | Notes |
-|------|----------------|-------|
-| Parallel (3 sources) | _TBD_ | Single run, read summary |
-| Sequential (sum of 3) | _TBD_ | Three single-source runs |
+For detailed debugging set `LOG_LEVEL=DEBUG` in `.env`.
 
 ---
 
-## Project layout
+## 🤝 Contributing
 
-```
-AI-Research-Assistant/
-├── ai/                          # Provided — do not modify
-├── src/
-│   ├── config.py
-│   ├── cli.py
-│   ├── api.py
-│   ├── core/researcher.py
-│   ├── concurrency/orchestrator.py
-│   ├── services/
-│   │   ├── research_service.py
-│   │   └── external_policy.py
-│   └── storage/
-│       ├── Research_Assistant_db.sql
-│       ├── repository.py
-│       └── source_cache.py
-├── docker/
-│   ├── entrypoint.sh
-│   ├── wait_for_db.py
-│   ├── verify_stack.py
-│   └── postgres/01-init.sql
-├── tests/
-├── data/research_questions.json
-├── demo_ai.py
-├── researcher.py
-├── check_db.py
-├── docker-compose.yml
-├── Dockerfile
-├── run.ps1 / run.sh
-├── requirements-runtime.txt
-├── requirements.txt
-├── .env.example
-├── .env.docker.example
-└── TOPIC.md
-```
+Please open issues or PRs. Do not modify files under `ai/` (course contract). Follow project style, include tests for new features.
 
 ---
 
-## Submission checklist
+## 📄 License
 
-- [ ] `pytest` passes; `pytest tests/test_ai_smoke.py` passes
-- [ ] `pytest --cov=src` ≥ 60%
-- [ ] `docker compose up --build` — `/health` returns OK
-- [ ] `docker run --rm $(docker build -q .)` offline demo works
-- [ ] `report/report.pdf` and presentation slides
-- [ ] Signed contribution statement
-- [ ] Git tag `v1.0-final` pushed; repo URL in report
-
-Grading: **Code 60% · Report 25% · Presentation 15%** — see `SOFTWARE_PROJECT.tex` §8.
-
-### Rules
-
-- **Do not** edit `ai/` (contract / automatic deduction).
-- **Do not** commit `.env` or API keys.
-- **Do** disclose AI-assistant use in the report.
+MIT — see `LICENSE`.
 
 ---
 
-## Troubleshooting
-
-| Symptom | Cause | Fix |
-|---------|-------|-----|
-| arXiv `301 Moved Permanently` | `http` → `https` redirect | `follow_redirects=True` in `orchestrator.py` (included) |
-| `Cache save failed ... PostgresSourceCache` | JSONB param type | `repository.py` uses `json.dumps` for cache rows |
-| `Port 5432 already in use` | Local Postgres vs Compose | Stop local Postgres or change host port in `docker-compose.yml` |
-| Stale / missing DB tables | Old Docker volume | `docker compose down -v` then `up --build` |
-| API won't start without keys | `REQUIRE_PROVIDER_KEYS=true` | Use Compose (sets `false`) or add keys to `.env` |
-| `/health` OK but `/ask` fails | Missing API keys | Add LLM + web-search keys to `.env` |
-| Gemini `503` | Provider outage | Retries; retry later or switch provider |
-| `wikipedia: 0 source(s)` | No search match | Normal for some queries |
-| Changes not in container | Stale image | `docker compose build app --no-cache` |
-| `check_db` insert fails | Raw list vs JSON string | Use latest `check_db.py` (`json.dumps`); rebuild image |
-
----
-
-## License & acknowledgements
-
-Course materials © AI Academy, National AI Center. The `ai/` package is provided as-is. Document any AI coding assistants used in the project report.
+**Last updated:** May 23, 2026

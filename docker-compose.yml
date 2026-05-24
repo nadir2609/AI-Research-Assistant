@@ -35,17 +35,17 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # Point at the postgres service and use the same credentials as the postgres
-      # service (POSTGRES_USER/POSTGRES_PASSWORD/POSTGRES_DB).
-      DATABASE_URL: postgresql://user:password@postgres:5432/research_assistant
-      REQUIRE_PROVIDER_KEYS: "false"
-      CACHE_DIR: /app/.cache
-      LOG_LEVEL: INFO
-      LLM_PROVIDER: anthropic
-      LLM_MODEL: claude-sonnet-4-6
-      WEB_SEARCH_PROVIDER: tavily
-      PER_SOURCE_TIMEOUT_SECONDS: "10"
-      CACHE_TTL_SECONDS: "86400"
+      # Values are read from the environment or the referenced env_file (.env).
+      # You can still override at runtime with `docker compose run -e VAR=...`.
+      DATABASE_URL: ${DATABASE_URL:-postgresql://user:password@postgres:5432/research_assistant}
+      REQUIRE_PROVIDER_KEYS: ${REQUIRE_PROVIDER_KEYS:-false}
+      CACHE_DIR: ${CACHE_DIR:-/app/.cache}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}
+      LLM_MODEL: ${LLM_MODEL:-claude-sonnet-4-6}
+      WEB_SEARCH_PROVIDER: ${WEB_SEARCH_PROVIDER:-tavily}
+      PER_SOURCE_TIMEOUT_SECONDS: ${PER_SOURCE_TIMEOUT_SECONDS:-"10"}
+      CACHE_TTL_SECONDS: ${CACHE_TTL_SECONDS:-"86400"}
     env_file:
       - path: .env
         required: false
@@ -86,8 +86,8 @@ services:
     environment:
       # Use the compose postgres service hostname so the demo container connects
       # to the bundled database when running under docker-compose.
-      DATABASE_URL: postgresql://user:password@postgres:5432/research_assistant
-      REQUIRE_PROVIDER_KEYS: "false"
+      DATABASE_URL: ${DATABASE_URL:-postgresql://user:password@postgres:5432/research_assistant}
+      REQUIRE_PROVIDER_KEYS: false
       CACHE_DIR: /app/.cache
       LOG_LEVEL: INFO
     entrypoint: ["sh", "/app/docker/entrypoint.sh"]

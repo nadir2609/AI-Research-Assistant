@@ -45,7 +45,7 @@ cp .env.example .env
 # edit .env with keys if needed
 
 # CLI
-python -m researcher ask "What is photosynthesis?" --sources wiki,arxiv
+python -m researcher ask "What is photosynthesis and what are its main stages?"
 
 # UI app
 uvicorn ui_app:ui_app --reload
@@ -134,19 +134,19 @@ See `.env.example` and `src/config.py` for the full list and defaults.
 Basic:
 
 ```bash
-python -m researcher ask "What is photosynthesis?"
+python -m researcher ask "What is photosynthesis and what are its main stages?"
 ```
 
 Select sources:
 
 ```bash
-python -m researcher ask "What is photosynthesis?" --sources wiki,arxiv
+python -m researcher ask "What is photosynthesis and what are its main stages?"
 ```
 
 Bypass cache:
 
 ```bash
-python -m researcher ask "What is photosynthesis?" --no-cache
+python -m researcher ask "What is photosynthesis and what are its main stages?" --no-cache
 ```
 
 Output includes synthesized answer, numbered citations, and per-source fetch summary.
@@ -174,7 +174,7 @@ Ask (example):
 ```bash
 curl -s -X POST http://127.0.0.1:8000/ask \
   -H "Content-Type: application/json" \
-  -d '{"question":"What is photosynthesis?","sources":["wiki","arxiv"],"no_cache":false}'
+  -d '{"question":"What is photosynthesis and what are its main stages?","sources":["wiki","arxiv"],"no_cache":false}'
 ```
 
 Response contains question, answer, citations, degraded flag, and fetch_results metadata.
@@ -196,7 +196,7 @@ docker compose --profile demo run --rm demo
 Run CLI inside container:
 
 ```bash
-docker compose run --rm app python -m researcher ask "What is photosynthesis?"
+docker compose run --rm app python -m researcher ask "What is photosynthesis and what are its main stages?"
 ```
 
 ---

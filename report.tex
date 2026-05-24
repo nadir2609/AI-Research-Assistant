@@ -1,0 +1,565 @@
+% =====================================================================
+% AI Academy -- National AI Center
+% Software Engineering Final Project -- Team Report Template
+%
+% HOW TO USE
+% ----------
+%   1. Edit the CONFIGURATION block below (team name, topic, members).
+%   2. Replace every [TODO: ...] with your content. TODOs render in red,
+%      so anything you forgot will be visually obvious in the PDF.
+%   3. Three kinds of cues throughout:
+%        - REQUIRED DELIVERABLE box (blue): exactly what we expect.
+%        - PROBING QUESTIONS box (amber): NOT a checklist; these are
+%          prompts that should shape how you write the section. A strong
+%          response engages with at least 2 of them; a weak response
+%          ignores them all.
+%        - "Your response:" placeholders: replace with your text/diagram.
+%   4. Target length: 8-10 pages including figures, excluding bibliography.
+%   5. Compile with pdfLaTeX. Overleaf works out of the box.
+% =====================================================================
+
+\documentclass[11pt,a4paper]{article}
+
+% ===== EARLY MACROS (must come before configuration) =================
+% (Full styling lower down; we just need \TODO and \ph available
+% before the configuration block uses them.)
+\usepackage[dvipsnames]{xcolor}
+\definecolor{accent2}{HTML}{8B0000}
+\definecolor{ph}{HTML}{6B7280}
+\newcommand{\TODO}[1]{\textcolor{accent2}{\textbf{[TODO: #1]}}}
+\newcommand{\phh}[1]{\textcolor{ph}{\textit{#1}}}
+
+% ===== CONFIGURATION (edit these) ====================================
+\newcommand{\teamname}{AI Research Assistant}
+\newcommand{\topicchoice}{Topic 4 --- Async Research Assistant}
+\newcommand{\member}[2]{\textbf{#1} (#2)}  % name, GitHub handle
+\newcommand{\reportdate}{May 23, 2026}
+\newcommand{\repolink}{\href{https://github.com/nadir2609/AI-Research-Assistant}{https://github.com/nadir2609/AI-Research-Assistant}}
+
+% ===== course meta (rarely changes) ==================================
+\newcommand{\coursecode}{AI-ENG-110}
+\newcommand{\coursename}{Software Engineering}
+\newcommand{\institution}{AI Academy, National AI Center}
+\newcommand{\semester}{Spring 2026}
+
+% ===== PACKAGES ======================================================
+\usepackage[margin=2.2cm,headheight=15pt]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[final,protrusion=true,expansion=false]{microtype}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{ragged2e}
+\usepackage{enumitem}
+\usepackage[parfill]{parskip}
+\usepackage{listings}
+\usepackage[most]{tcolorbox}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+\usepackage[hidelinks]{hyperref}
+
+\emergencystretch=3em
+\hbadness=10000
+\hfuzz=2pt
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=NavyBlue,
+  urlcolor=NavyBlue,
+  citecolor=NavyBlue,
+  pdftitle={\coursecode\ Final Project Report},
+  pdfauthor={\teamname}
+}
+
+% ===== STYLING =======================================================
+\definecolor{accent}{HTML}{0B3D91}
+\definecolor{soft}{HTML}{F2F4F8}
+\definecolor{deliver}{HTML}{E8F0FE}
+\definecolor{deliverframe}{HTML}{1A56DB}
+\definecolor{probe}{HTML}{FFF8E1}
+\definecolor{probeframe}{HTML}{B45309}
+
+\titleformat{\section}
+  {\Large\bfseries\color{accent}}{\thesection.}{0.6em}{}
+\titleformat{\subsection}
+  {\large\bfseries\color{accent}}{\thesubsection}{0.5em}{}
+
+\newcommand{\ans}[1]{\rule[-2pt]{#1}{0.5pt}}
+\let\ph\phh  % alias the early \phh as \ph for consistency with the body
+
+% Deliverable callout (light blue)
+\newtcolorbox{deliverbox}{
+  colback=deliver, colframe=deliverframe, boxrule=0.5pt,
+  arc=2pt, left=8pt, right=8pt, top=4pt, bottom=4pt
+}
+% Probing-question callout (light amber)
+\newtcolorbox{probebox}{
+  colback=probe, colframe=probeframe, boxrule=0.5pt,
+  arc=2pt, left=8pt, right=8pt, top=4pt, bottom=4pt
+}
+
+\newcommand{\answerbox}[1]{%
+  \par\noindent
+  \fcolorbox{black!30}{soft}{%
+    \parbox{\dimexpr\linewidth-2\fboxsep-2\fboxrule\relax}{%
+      \vspace{0pt}\centering
+      \ph{[Your response here -- replace this placeholder.]}
+      \vspace{#1}
+    }%
+  }\par
+}
+
+\newcommand{\figureplaceholder}[1]{%
+  \par\noindent
+  \begin{center}
+  \fcolorbox{black!30}{soft}{%
+    \parbox{0.75\linewidth}{%
+      \vspace{0pt}\centering
+      \ph{[Replace this box with \texttt{\textbackslash includegraphics\{...\}} or a tikzpicture.]}
+      \vspace{#1}
+    }%
+  }
+  \end{center}
+}
+
+\definecolor{codegreen}{rgb}{0,0.55,0}
+\definecolor{codegray}{rgb}{0.4,0.4,0.4}
+\definecolor{codepurple}{rgb}{0.55,0,0.78}
+\definecolor{backcolour}{rgb}{0.97,0.97,0.97}
+
+\lstdefinestyle{python}{
+  language=Python,
+  backgroundcolor=\color{backcolour},
+  commentstyle=\color{codegreen},
+  keywordstyle=\color{accent},
+  numberstyle=\tiny\color{codegray},
+  stringstyle=\color{codepurple},
+  basicstyle=\ttfamily\footnotesize,
+  breakatwhitespace=false,
+  breaklines=true,
+  keepspaces=true,
+  numbers=left,
+  numbersep=6pt,
+  tabsize=2,
+  frame=single,
+  framerule=0.4pt,
+  rulecolor=\color{black!30},
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textit{\coursecode\ -- Final Report -- \teamname}}
+\fancyhead[R]{\small\textit{\semester}}
+\fancyfoot[L]{\small\textit{\institution}}
+\fancyfoot[R]{\small Page \thepage\ of \pageref{LastPage}}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+
+% =====================================================================
+\begin{document}
+
+\begin{center}
+{\small \textsc{\institution} \\[0.2em] \textsc{\coursecode\ -- \coursename\ -- \semester}}\\[1.2em]
+{\Large\bfseries\color{accent} Final Project Report}\\[0.3em]
+{\LARGE\bfseries \topicchoice}\\[0.6em]
+\rule{0.85\textwidth}{0.6pt}
+\end{center}
+
+\vspace{0.6em}
+\begin{tabularx}{\textwidth}{@{}lXlX@{}}
+\textbf{Team:} & \teamname & \textbf{Date:} & \reportdate \\
+\textbf{Repo:} & \repolink & \textbf{Tag:} & \texttt{v1.0-final} \\
+\textbf{Members:} & \multicolumn{3}{X@{}}{%
+  \member{Nadir Askarov}{@nadir2609},\quad
+  \member{Evez Huseynov}{@evez12},\quad
+  \member{Narmina Ibrahimova}{@nnrmina}
+}\\
+\end{tabularx}
+\vspace{0.4em}\hrule\vspace{0.6em}
+
+% ===== EXECUTIVE SUMMARY =============================================
+\section*{Executive Summary}
+\addcontentsline{toc}{section}{Executive Summary}
+
+\begin{deliverbox}
+\textbf{Required.} Exactly one paragraph (5--7 sentences). What you built, the headline concurrency speedup you measured, your headline robustness story, and the single most surprising thing the team learned. \emph{This is the first thing the grader reads. If you cannot write it clearly, you do not yet understand your own project.}
+\end{deliverbox}
+
+\begin{probebox}
+\textit{Your paragraph should answer:} What problem did the system solve? What is the one number that proves the concurrency design works? What is the one failure mode you handled well? What would you change if you started over?
+\end{probebox}
+
+We built an async research assistant that accepts a question via CLI or HTTP, fetches Wikipedia, arXiv, and web-search results in parallel, and synthesizes a cited answer using the provided AI module. The SE layer adds typed configuration, validation, structured logging, retry/rate-limit policies, tiered caching (filesystem + PostgreSQL), and persistence of final answers. In a synthetic latency benchmark (3 sources at 350\,ms each) the concurrent pipeline cut wall time from 1.07\,s to 0.56\,s (1.92$\times$), confirming the design targets network-bound latency. The headline robustness feature is graceful degradation: if one source fails or times out, the system still answers and annotates the missing source rather than aborting. The most surprising lesson was how often valid-looking LLM output can still violate constraints (invalid citations or URLs), which made output sanitization and citation filtering essential. If starting over, we would change LLM model, use high-cost model to increase user experienc.
+
+% ===== TABLE OF CONTENTS =============================================
+\tableofcontents
+\vspace{0.6em}\hrule\vspace{0.4em}
+
+% =====================================================================
+\section{Project Overview}
+
+\subsection{Problem framing \& scope}
+
+\begin{deliverbox}
+\textbf{Required.} 2--3 paragraphs. State the topic problem in your own words. List the inputs, outputs, and any user-facing entry points (CLI commands, HTTP endpoints). State which provider stack you used (LLM, embedding, USDA, web search).
+\end{deliverbox}
+
+\begin{probebox}
+\textit{Beyond the obvious:} which parts of the TOPIC.md spec did your team explicitly decide \emph{not} to do, and why? Where did you tighten the spec? Where did you loosen it?
+\end{probebox}
+
+This project implements Topic 4: an async research assistant that answers natural-language questions by gathering evidence from Wikipedia, arXiv, and a web-search provider, then synthesizing a 3--6 sentence response with inline citations. Inputs are a question string plus an optional source subset; outputs are the synthesized answer, a references list (title + URL), and per-source timing metadata. The user-facing entry points are the CLI command \texttt{python -m researcher ask "<question>"} and the HTTP endpoint \texttt{POST /ask}, both of which return cited answers and a source fetch summary.
+
+We intentionally did not build a web UI or streaming output; the deliverable focuses on CLI + API correctness, caching, and robustness. We tightened the spec by enforcing stricter input validation (question length, URL scheme checks, control-character stripping) and by capping per-source results (\texttt{MAX\_SOURCES\_PER\_QUERY}). The provider stack is LLM synthesis via Anthropic/OpenAI/Gemini (configured by env) and web search via Tavily/Serper/DuckDuckGo.
+
+\subsection{Provider choice and the AI module contract}
+
+\begin{deliverbox}
+\textbf{Required.} Name the LLM, embedding, and any auxiliary provider you used, and the model identifiers (\texttt{claude-sonnet-4-6}, \texttt{text-embedding-3-small}, etc.). State what \texttt{ai/} functions you call. \emph{Confirm in one sentence that you did not modify the public interface of the provided \texttt{ai/} package.}
+\end{deliverbox}
+
+\begin{probebox}
+\textit{Push deeper:} how does your code defend against a malformed model response? What happens when the provider returns valid JSON that is semantically wrong (wrong topic enum, negative grams, etc.)?
+\end{probebox}
+
+We use the provided \texttt{ai.fetch\_wikipedia}, \texttt{ai.fetch\_arxiv}, \texttt{ai.fetch\_web}, and \texttt{ai.synthesize} functions. The default LLM configuration in \texttt{.env} is \texttt{LLM\_PROVIDER=gemini} with \texttt{LLM\_MODEL=gemini-2.5-flash}; web search defaults to \texttt{WEB\_SEARCH\_PROVIDER=serper}. No embedding provider is used for Topic 4. We did not modify the public interface of the provided \texttt{ai/} package. To defend against malformed model responses, we sanitize fetched sources (URL scheme checks, snippet/title length caps) and sanitize the final answer (strip control chars, drop invalid citations); semantically invalid payloads are rejected before persistence or display.
+
+% =====================================================================
+\section{Architecture}\label{sec:arch}
+
+\subsection{Module map}
+
+\begin{deliverbox}
+\textbf{Required.} An architecture diagram (boxes-and-arrows or sequence diagram) showing the main modules and their dependencies. Identify on the diagram: the boundary of the provided \texttt{ai/} package, your service layer that wraps it, your core business logic, your concurrency layer, your storage layer, and your CLI/HTTP entry points.
+\end{deliverbox}
+
+\begin{probebox}
+\textit{Interpret your own diagram:} which arrows cross the AI-module boundary? Which arrows cross the storage boundary? If you had to swap providers (Anthropic $\to$ OpenAI), how many files would change?
+\end{probebox}
+
+\begin{center}
+\begin{verbatim}
+CLI / FastAPI
+     |
+  Researcher (core)
+     |
+ ResearchService  -- validation, cache, history
+     |            -- ExternalCallPolicy
+     v
+ResearchOrchestrator -> ai.fetch_* (wikipedia/arxiv/web)
+     |
+  ai.synthesize
+     |
+PostgresRepository + TieredSourceCache (PG + FS)
+\end{verbatim}
+\end{center}
+
+\textbf{Module-by-module summary (1--2 sentences each):} The entry points are \texttt{src/cli.py} and \texttt{src/api.py}, which parse inputs, validate them, and call the core. \texttt{src/core/researcher.py} wires settings, cache, repository, and the service layer. \texttt{src/services/research\_service.py} owns the pipeline: cache lookup, orchestration, synthesis, and history persistence. \texttt{src/concurrency/orchestrator.py} manages async parallel fetch with a shared \texttt{httpx} client and per-source timeouts. \texttt{src/services/external\_policy.py} enforces retries, rate limits, and concurrency bounds. \texttt{src/storage/*} handles PostgreSQL persistence and filesystem caching.
+
+\subsection{OOP design \& key abstractions}
+
+\begin{deliverbox}
+\textbf{Required.} Identify at least one example of inheritance or composition \emph{in your own code} (not the provided package's). Quote 5--10 lines of the relevant class or object design. Justify why this abstraction was the right tool; if you used an ABC, explain why.
+\end{deliverbox}
+
+\begin{probebox}
+\textit{Defensibility:} if a grader asked "why is this an abstract base class rather than a Protocol, a plain function with a callable parameter, or a configuration enum?" --- what is your answer? Are there places where you used composition where inheritance would have been wrong, or vice versa?
+\end{probebox}
+
+\textbf{Code listing:}
+\begin{lstlisting}[style=python]
+class SourceCache(ABC):
+    @abstractmethod
+    async def get(self, source_type: str, query: str) -> list[Source] | None: ...
+    @abstractmethod
+    async def set(self, source_type: str, query: str, sources: list[Source]) -> None:
+    ...
+
+class FilesystemSourceCache(SourceCache):
+    async def get(self, source_type: str, query: str) -> list[Source] | None: ...
+    async def set(self, source_type: str, query: str, sources: list[Source]) -> None: 
+    ...
+\end{lstlisting}
+
+\textbf{Justification (2--3 sentences):} The cache needs multiple interchangeable backends (filesystem and PostgreSQL) with identical async semantics, so an ABC gives a crisp contract without leaking storage-specific details into the service layer. We also compose caches with \texttt{TieredSourceCache} (read-through, write-to-all), which is cleaner than inheritance for cross-cutting behavior. If we used a plain function interface, we would lose discoverability and make backend swaps harder to validate.
+
+\subsection{Data flow across module boundaries}
+
+\begin{deliverbox}
+\textbf{Required.} List the dataclasses you defined for your own SE layer. Confirm in one sentence that no naked dictionaries cross module boundaries.
+\end{deliverbox}
+
+\begin{probebox}
+\textit{The hardest call:} when did you reuse a dataclass from the provided \texttt{ai/} package vs.\ wrap it in a new one for your SE layer? What was the trigger for wrapping?
+\end{probebox}
+
+SE-layer dataclasses include \texttt{Settings}, \texttt{ResearchResult}, \texttt{SourceFetchResult}, \texttt{RateLimitConfig}, and \texttt{Researcher}. Boundary models from the provided package (\texttt{Source}, \texttt{AnswerWithCitations}) are passed across layers unchanged. No naked dictionaries cross module boundaries; dicts appear only at serialization points (JSONB payloads for PostgreSQL and JSON files for the filesystem cache).
+
+% =====================================================================
+\section{Concurrency \& Performance}\label{sec:concurrency}
+
+\subsection{Why this concurrency model}
+
+\begin{deliverbox}
+\textbf{Required.} State which concurrency primitive you used (\texttt{asyncio}, \texttt{ProcessPoolExecutor}, \texttt{ThreadPoolExecutor}) and why. Identify the bottleneck the parallel design targets. State the bound (e.g.\ \texttt{Semaphore(10)}) and how you picked it.
+\end{deliverbox}
+
+\begin{probebox}
+\textit{Justify against alternatives:} could you have used threads instead of asyncio? Why not? What is the smallest workload at which the concurrent design starts to win against sequential? What happens if you set the semaphore to 1 vs.\ 100?
+\end{probebox}
+
+We use \texttt{asyncio} with a shared \texttt{httpx.AsyncClient} because the dominant bottleneck is I/O latency from Wikipedia, arXiv, and web search. Parallel \texttt{asyncio.gather} reduces total wall time to the slowest source (plus synthesis), and each source is wrapped with per-source timeouts. Concurrency is bounded by \texttt{MAX\_PARALLEL\_EXTERNAL\_CALLS} (default 3) via an \texttt{asyncio.Semaphore} inside \texttt{ExternalCallPolicy}, which keeps us under provider rate limits without serializing everything.
+
+\subsection{Sequential-vs-concurrent benchmark}
+
+\begin{deliverbox}
+\textbf{Required.} A table reporting wall-clock time for the same workload run sequentially vs.\ concurrently. State $N$ (number of requests), the machine, the python version, whether caches were cleared, and the command line. Reproduce the table also in your README.
+\end{deliverbox}
+
+\begin{probebox}
+\textit{Honest interpretation:} did you reach the theoretical $N\times$ speedup? If not, what was the new bottleneck (provider rate limit? GIL? network RTT? single-threaded DB writes?). What would push the curve further?
+\end{probebox}
+
+\begin{center}\small
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Workload} & $N$ & \textbf{Sequential (s)} & \textbf{Concurrent (s)} & \textbf{Speedup} \\
+\midrule
+\textit{1 question, 3 sources (synthetic 0.35\,s/source)} & 3 & 1.07 & 0.56 & 1.92$\times$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Discussion (2--3 sentences):} The synthetic benchmark  falls short of the ideal 3$\times$ because of event-loop overhead and unavoidable sequential work (logging, aggregation). With real network latency, the concurrent design should show larger absolute gains, but the speedup will still be bounded by provider rate limits.
+
+\subsection{Rate limit \& politeness}
+
+\begin{deliverbox}
+\textbf{Required.} State the rate-limit strategy (sleep-on-429, token bucket, leaky bucket, request budget). Document the configured budget. State the highest burst your test suite produces.
+\end{deliverbox}
+
+\begin{probebox}
+\textit{Failure-mode test:} have you actually observed a 429 from the provider during development, or is this strategy untested in anger? What does the log look like when the budget is hit?
+\end{probebox}
+
+Rate limiting uses a per-source token-bucket (request budget) implemented in \texttt{ExternalCallPolicy}. Default budgets are \texttt{WIKIPEDIA\_RPS=2}, \texttt{ARXIV\_RPS=1}, \texttt{WEB\_RPS=1}, \texttt{LLM\_RPS=1} with \texttt{RATE\_LIMIT\_BURST=2}. The highest burst exercised by tests is 2 requests. 429 responses trigger backoff and \texttt{Retry-After} parsing where available.
+
+% =====================================================================
+\section{Robustness \& Error Handling}\label{sec:robustness}
+
+\subsection{Wrapping the AI module}
+
+\begin{deliverbox}
+\textbf{Required.} Describe your service-layer wrapper around \texttt{ai.*} calls: retries (which exceptions, how many attempts, backoff schedule), timeouts (per-call value), structured logging (what fields, at what level), input validation (what you check before calling, what you check on the response).
+\end{deliverbox}
+
+\begin{probebox}
+\textit{Pressure-test:} what happens if the provider returns a 500? A 429? A connection reset mid-stream? A perfectly-formed JSON that contradicts the schema? Walk through one of these end-to-end.
+\end{probebox}
+
+Every external call (source fetch or LLM synthesis) is wrapped by \texttt{ExternalCallPolicy}, which retries \texttt{TimeoutError}/\texttt{ProviderError}/\texttt{OSError} up to \texttt{EXTERNAL\_MAX\_RETRIES} (default 3) with exponential backoff (0.5\,s to 8\,s) and jitter. Each source fetch is additionally guarded by a per-source timeout from \texttt{PER\_SOURCE\_TIMEOUT\_SECONDS}. We log request start and per-source results at INFO, cache failures at WARN, and synthesis failures with stack traces. Inputs are validated with \texttt{validate\_question} and \texttt{validate\_source\_names}; outputs are sanitized by \texttt{sanitize\_fetched\_sources} and \texttt{sanitize\_answer} to drop invalid URLs, control characters, or malformed citations.
+
+\subsection{Failure-mode analysis (one concrete incident)}
+
+\begin{deliverbox}
+\textbf{Required.} Pick \emph{one} failure mode you actually exercised (provider 5xx, timeout, malformed response, network drop, disk full, corrupted image, USDA outage, etc.). Describe: (i) how you injected the failure, (ii) what the system did, (iii) what the user saw, (iv) what the logs showed.
+\end{deliverbox}
+
+\begin{probebox}
+\textit{Go beyond "graceful degradation worked":} what did you originally expect to happen vs.\ what actually happened? Did the test surface any design issue that you then fixed? Did the log give you enough to diagnose it without running the code again?
+\end{probebox}
+
+We exercised a timeout failure by patching a source fetcher to sleep past the configured timeout (see \texttt{tests/test\_orchestrator.py::test\_per\_source\_timeout}). The orchestrator recorded an error of the form ``wikipedia timeout'' and returned an empty source list for that origin while leaving the others intact. The user-facing CLI output includes ``Warning: answer was produced with partial source failures.'' and the synthesized answer still returns citations from the remaining sources.
+
+\subsection{Input validation}
+
+\begin{deliverbox}
+\textbf{Required.} For every entry point (CLI, HTTP, file, env), list the validation rules. State what error message the user gets when validation fails.
+\end{deliverbox}
+
+\begin{probebox}
+\textit{Adversarial:} could a malformed image kill your service? A 100\,MB JSON request? A query of 50,000 characters? A path that escapes your storage directory?
+\end{probebox}
+
+CLI validation enforces a 3--1000 character question, requires at least one alphanumeric character, and rejects control characters; invalid input raises a \texttt{click.BadParameter} (e.g.\ ``Question is too long''). HTTP validation mirrors this through Pydantic field bounds and \texttt{validate\_source\_names}, returning 400 with the validation message. File input validation for \texttt{data/research\_questions.json} requires a \texttt{questions} list with \texttt{text} fields (see demo loader tests). Environment validation enforces provider keys (unless \texttt{REQUIRE\_PROVIDER\_KEYS=false}), a PostgreSQL \texttt{DATABASE\_URL} scheme, and a writable \texttt{CACHE\_DIR}; invalid values raise \texttt{SettingsError}, while a missing \texttt{DATABASE\_URL} simply disables PostgreSQL and keeps filesystem cache only.
+
+% =====================================================================
+\section{Storage \& Caching}\label{sec:storage}
+
+\subsection{Schema}
+
+\begin{deliverbox}
+\textbf{Required.} The SQLite schema for your domain tables. Include indices and foreign keys. State which fields are derived (cached) vs.\ source-of-truth.
+\end{deliverbox}
+
+\begin{probebox}
+\textit{Schema choices:} why did you store embedding bytes as a blob rather than serialized JSON, or vice versa? What happens to the DB if the embedding dimension changes (a different provider, a different model)?
+\end{probebox}
+
+\begin{lstlisting}[style=python,language=sql,numbers=none,basicstyle=\ttfamily\small]
+CREATE TABLE IF NOT EXISTS research_cache (
+    id SERIAL PRIMARY KEY,
+    source_type TEXT NOT NULL,
+    query_text TEXT NOT NULL,
+    content JSONB NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(source_type, query_text)
+);
+
+CREATE TABLE IF NOT EXISTS research_history (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    question TEXT NOT NULL,
+    answer TEXT NOT NULL,
+    citations JSONB NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+\end{lstlisting}
+
+In this schema, \texttt{research\_cache.content} is derived (cached fetch results), while \texttt{research\_history} is the source-of-truth record of user questions, final answers, and citations; \texttt{created\_at} fields are metadata.
+
+\subsection{Caching policy}
+
+\begin{deliverbox}
+\textbf{Required.} What do you cache, how long, where, and how is the cache invalidated. Report cache hit rate from a demo run (a single number is fine).
+\end{deliverbox}
+
+\begin{probebox}
+\textit{Correctness vs.\ freshness:} which cached values can become stale (e.g.\ USDA nutrition for a renamed food, an LLM summary if the prompt changes)? How would you detect and evict them in production?
+\end{probebox}
+
+We cache results for \texttt{CACHE\_TTL\_SECONDS} (default 86{,}400\,s). The cache is tiered: PostgreSQL is checked first when available, then the filesystem cache under \texttt{CACHE\_DIR}, and successful fetches are written to both. Invalidation is time-based (TTL); filesystem entries are deleted on expiry and DB entries are overwritten on update. 
+
+% =====================================================================
+\section{Testing}\label{sec:testing}
+
+\subsection{Strategy \& coverage}
+
+\begin{deliverbox}
+\textbf{Required.} Report the coverage number (\texttt{pytest --cov}). State how you mocked the AI module and the HTTP layer. Confirm the provided \texttt{tests/test\_ai\_smoke.py} still passes.
+\end{deliverbox}
+
+\begin{probebox}
+\textit{Quality vs.\ coverage:} which lines did you decide \emph{not} to cover, and why? Which mocks did you have to redesign mid-project because they were testing the wrong thing?
+\end{probebox}
+
+All tests are offline: the AI module is mocked via \texttt{FakeLLM}/\texttt{FakeWebSearch} and \texttt{AsyncMock}; service and orchestrator layers are patched to avoid network calls; the PostgreSQL pool is mocked with \texttt{AsyncMock}. Coverage is 71\% for \texttt{src/}, and the provided \texttt{tests/test\_ai\_smoke.py} passes. We did not cover \texttt{src/api.py} and \texttt{src/\_\_main\_\_.py} because the tests focus on service logic rather than HTTP wiring.
+
+\begin{center}\small
+\begin{tabular}{lc}
+\toprule
+\textbf{Suite} & \textbf{Coverage} \\
+\midrule
+\texttt{src/} (your SE layer) & 71\,\% \\
+Provided \texttt{ai/} smoke tests & yes \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Notable tests}
+
+\begin{deliverbox}
+\textbf{Required.} Highlight at least three tests: (i) one happy-path end-to-end test, (ii) one concurrency test (e.g.\ that \texttt{asyncio.gather} behaves correctly when one task raises), (iii) one error-path test that surfaces a real bug you would otherwise have missed.
+\end{deliverbox}
+
+\begin{probebox}
+\textit{What didn't you test?} What is the test you wish you had time to write?
+\end{probebox}
+
+Happy-path end-to-end: \texttt{tests/test\_research\_service\_cache.py::test\_ask\_uses\_filesystem\_cache\_on\_second\_call} verifies a full ask flow with caching and synthesis patched. Concurrency: \texttt{tests/test\_orchestrator.py::test\_gather\_one\_failure\_degrades} confirms that one failing source still returns usable results from others. Error-path: \texttt{tests/test\_validation.py::test\_service\_rejects\_all\_sources\_after\_sanitization} ensures invalid URLs are dropped and the service fails with a clear error instead of producing a broken answer. We wish we had time for a load test that exercises rate limiting and PostgreSQL under concurrent \texttt{/ask} traffic.
+
+% =====================================================================
+\section{Deployment \& Reproducibility}\label{sec:deploy}
+
+\subsection{Docker image}
+
+\begin{deliverbox}
+\textbf{Required.} The exact \texttt{docker build} and \texttt{docker run} commands. The image size. The Python version baked in. Note whether you use a single-stage or multi-stage build.
+\end{deliverbox}
+
+\begin{probebox}
+\textit{Engineering trade-offs:} did you ship an Alpine, slim, or full base image, and why? How does your image size compare to a fresh \texttt{python:3.12-slim} ($\sim$120\,MB)?
+\end{probebox}
+
+\texttt{docker build -t research-assistant .} and \texttt{docker run --rm research-assistant} (offline demo), or \texttt{docker compose up --build} for the full API + PostgreSQL stack. The image is single-stage, based on \texttt{python:3.12-slim-bookworm} (Python 3.12). Image size was about 160MB.
+
+\subsection{Configuration}
+
+\begin{deliverbox}
+\textbf{Required.} A short list of every environment variable the app reads, and what happens if each is missing.
+\end{deliverbox}
+
+Required when \texttt{REQUIRE\_PROVIDER\_KEYS=true}: \texttt{LLM\_PROVIDER} + matching key (\texttt{ANTHROPIC\_API\_KEY}, \texttt{OPENAI\_API\_KEY}, \texttt{GOOGLE\_API\_KEY}, or \texttt{LLM\_API\_KEY}) and \texttt{WEB\_SEARCH\_PROVIDER} + key (\texttt{TAVILY\_API\_KEY} or \texttt{SERPER\_API\_KEY}; DuckDuckGo needs none). Missing required keys raises \texttt{SettingsError} at startup. Optional: \texttt{DATABASE\_URL} (unset disables PostgreSQL cache/history), \texttt{CACHE\_DIR} and \texttt{CACHE\_TTL\_SECONDS} (defaults used), \texttt{PER\_SOURCE\_TIMEOUT\_SECONDS}, \texttt{MAX\_SOURCES\_PER\_QUERY}, \texttt{MAX\_PARALLEL\_EXTERNAL\_CALLS}, and retry/rate-limit settings (default values apply; invalid values raise \texttt{SettingsError}). \texttt{REQUIRE\_PROVIDER\_KEYS=false} allows startup without keys (used in Docker for the health endpoint). \texttt{LOG\_LEVEL} defaults to INFO; invalid values are rejected.
+
+% =====================================================================
+\section{Limitations \& Future Work}\label{sec:limits}
+
+\begin{deliverbox}
+\textbf{Required.} 3--5 bullet points. Honest list of where the system is brittle, what it would take to productionize, and what you would do differently with another week.
+\end{deliverbox}
+
+\begin{probebox}
+\textit{Be honest:} no project is perfect. What was the worst design decision you made? What did you not get to test under load? What is the scenario most likely to break the system on a busy day?
+\end{probebox}
+
+\begin{itemize}[topsep=2pt,itemsep=2pt,leftmargin=2.2em]
+  \item No streaming responses; long LLM calls block until completion. A websocket/SSE stream would improve UX.
+  \item The benchmark is synthetic; a live benchmark with real providers is still needed for production-grade latency numbers.
+  \item Make implementation of rate limiting better
+\end{itemize}
+
+% =====================================================================
+\section{Tools \& Acknowledgements}\label{sec:tools}
+
+\begin{deliverbox}
+\textbf{Required.} Disclose substantial AI-assistant use. For each significant LLM-aided contribution: which module, which assistant (Claude/ChatGPT/Cursor/Copilot/etc.), and whether the team reviewed and adapted it.
+\end{deliverbox}
+
+\begin{probebox}
+\textit{Cultural note:} "AI helped with everything" is not a useful disclosure; "Cursor drafted the initial \texttt{retry\_policy.py}; we rewrote backoff logic after observing it hit the rate limit" is.
+\end{probebox}
+
+GPT-Codex 5.2 helped to implement retry and rate-limit policy wrapping every external call (including the provided AI calls), generate test skeletons, cli implementation, concurrency layer that parallelizes the I/O-bound work.
+
+
+% =====================================================================
+\section*{References}
+\addcontentsline{toc}{section}{References}
+
+\begin{enumerate}[label={[\arabic*]},leftmargin=2.4em,itemsep=2pt]
+  \item Wikipedia API documentation, https://www.mediawiki.org/wiki/API:Main\_page
+  \item arXiv API user manual, https://info.arxiv.org/help/api/index.html
+  \item Serper Search API docs, https://serper.dev/
+  \item FastAPI documentation, https://fastapi.tiangolo.com/
+  \item HTTPX documentation, https://www.python-httpx.org/
+  \item asyncpg documentation, https://magicstack.github.io/asyncpg/current/
+\end{enumerate}
+
+\appendix
+% =====================================================================
+\section{Appendix --- Reproducing the benchmark}
+\textbf{Exact commands to reproduce the §\ref{sec:concurrency} benchmark.} 
+
+\begin{lstlisting}[style=python,language=bash,numbers=none]
+$ git clone https://github.com/nadir2609/AI-Research-Assistant && cd AI-Research-Assistant
+$ copy .env.example .env  # fill in keys (Windows); use cp on macOS/Linux
+
+# Clear cache between runs if needed:
+#   rmdir /s /q .cache   (Windows)  or  rm -rf .cache
+
+# Parallel (all sources):
+$ python -m researcher ask "What is photosynthesis?" --sources wiki,arxiv,web --no-cache
+
+# Sequential baseline (sum the three runs):
+$ python -m researcher ask "What is photosynthesis?" --sources web --no-cache
+$ python -m researcher ask "What is photosynthesis?" --sources arxiv --no-cache
+$ python -m researcher ask "What is photosynthesis?" --sources wiki --no-cache
+\end{lstlisting}
+
+\vspace{1em}\hrule\vspace{0.6em}
+\noindent\small\textit{End of report --- thank you for reading.}
+
+\end{document}
